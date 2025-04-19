@@ -4,7 +4,6 @@ import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
@@ -119,51 +118,59 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
 
     /**
      * Applies the validation results (creating annotations) back in the UI thread.
-     * @param file The PSI file.
-     * @param annotationResult The results from [doAnnotate].
+     * Ensures only one annotation (with the highest severity) is shown per line if multiple issues are reported.
+     * @param file The PSI file being annotated.
+     * @param annotationResult The validation results from the background task ([doAnnotate]).
      * @param holder The object used to create annotations in the editor.
      */
-    // Krok 3: Aplikowanie wyników (tworzenie adnotacji) w wątku głównym
     override fun apply(file: PsiFile, annotationResult: DotValidationResult?, holder: AnnotationHolder) {
-        LOG.info("!!! DotSyntaxAnnotator: apply CALLED for ${file.name} (result is null: ${annotationResult == null}) !!!")
         if (annotationResult == null || annotationResult.issues.isEmpty()) {
-            // ... (logging bez zmian) ...
+            LOG.debug("No issues found or annotation result is null for ${file.name}.")
             return
         }
-        // ... (logging bez zmian) ...
+        LOG.debug("Processing ${annotationResult.issues.size} raw issues for ${file.name}.")
 
-        // --- POPRAWIONY SPOSÓB UZYSKANIA DOKUMENTU ---
-        // Uzyskaj dokument z PsiFile przekazanego do metody apply
         val document = file.viewProvider.document
-        // Alternatywnie, można użyć PsiDocumentManager:
-        // val document = PsiDocumentManager.getInstance(file.project).getDocument(file)
-
         if (document == null) {
+            // Essential to log this error, as we cannot proceed without the document.
             LOG.error("Could not get document for file ${file.name} in apply phase.")
-            return // Cannot proceed without the document
+            return
         }
-        // --- Koniec poprawki ---
 
+        // Prioritize issues: If multiple issues exist for the same line,
+        // select only the one with the highest severity (e.g., Error > Warning).
+        val issuesByLineNumber: Map<Int, List<DotIssueInfo>> = annotationResult.issues.groupBy { it.line }
+        val highestSeverityIssuesPerLine: List<DotIssueInfo> = issuesByLineNumber.mapNotNull { (_, issuesOnThisLine) ->
+            // HighlightSeverity implements Comparable, allowing maxByOrNull to find the most severe issue.
+            issuesOnThisLine.maxByOrNull { it.severity }
+        }
 
-        for (issue in annotationResult.issues) {
-            // Dostosuj numer linii (1-based -> 0-based)
+        LOG.debug("Applying ${highestSeverityIssuesPerLine.size} prioritized annotations for ${file.name}.")
+
+        // Create annotations only for the highest severity issue found for each line.
+        for (issue in highestSeverityIssuesPerLine) {
+            // Adjust line number from 1-based (Graphviz) to 0-based (Document).
             val line = issue.line - 1
             if (line >= 0 && line < document.lineCount) {
                 try {
                     val lineStartOffset = document.getLineStartOffset(line)
                     val lineEndOffset = document.getLineEndOffset(line)
-                    val range = TextRange(lineStartOffset, lineEndOffset)
+                    val range = TextRange(lineStartOffset, lineEndOffset) // Range covers the whole line.
 
+                    // Create annotation using the highest severity found for this line.
                     holder.newAnnotation(issue.severity, "Graphviz issue")
                         .range(range)
-                        .tooltip(issue.message)
+                        .tooltip(issue.message) // Tooltip shows the message of the highest severity issue.
                         .create()
-                    // ... (logging bez zmian) ...
-                } catch (e: Exception){
+                    LOG.debug("Created annotation: ${issue.severity} on line ${issue.line}, range $range")
+
+                } catch (e: Exception) {
+                    // Log exceptions during annotation creation process for a specific issue.
                     LOG.error("Failed to apply annotation for issue on line ${issue.line} in ${file.name}", e)
                 }
             } else {
-                // ... (logging bez zmian) ...
+                // Log if Graphviz reported an invalid line number relative to the document.
+                LOG.warn("Invalid line number ${issue.line} reported by Graphviz for file ${file.name}.")
             }
         }
     }
