@@ -238,7 +238,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
     fun showError(message: String) {
         imageLabel.icon = null
         imageLabel.text = null
-        statusLabel.text = "Error: $message" // Prefix with "Error: "
+        statusLabel.text = message // Prefix with "Error: "
         statusLabel.foreground = UIUtil.getErrorForeground()
         statusLabel.isVisible = true
         LOG.debug("Error message displayed in status label: '$message'")
