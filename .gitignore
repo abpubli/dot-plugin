@@ -1,4 +1,6 @@
 .kotlin
+.idea
+gradle
 .gradle
 **/build/
 !src/**/build/
