@@ -55,10 +55,6 @@ dot -V
 2.  Use the view mode buttons (usually in the top-right corner of the editor panel) to switch between `Editor`, `Split` (Editor and Preview side-by-side), and `Preview` modes.
 3.  The preview will update automatically as you modify the DOT file (or after a short delay).
 
-## Dependencies
-
-* Graph rendering is powered by the [graphviz-java](https://github.com/guru-nidi/graphviz-java) library.
-
 ## License
 
 Distributed under the Apache License. See `LICENSE` file for more information.
