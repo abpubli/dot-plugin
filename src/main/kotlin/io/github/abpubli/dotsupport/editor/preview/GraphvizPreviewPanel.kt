@@ -239,8 +239,6 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
      * @param message The status message to display.
      */
     private fun showStatus(message: String) {
-        imageLabel.icon = null
-        imageLabel.text = null
         statusTextArea.text = message
         statusTextArea.foreground = JBUI.CurrentTheme.Label.foreground() // Standard text color
         statusTextArea.background = UIUtil.getPanelBackground() // Ensure background matches panel
@@ -249,8 +247,6 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         LOG.debug("Status message displayed in status area: '$message'")
         statusScrollPane.revalidate() // Revalidate the scroll pane
         statusScrollPane.repaint()
-        this.revalidate()
-        this.repaint()
     }
 
     /**
