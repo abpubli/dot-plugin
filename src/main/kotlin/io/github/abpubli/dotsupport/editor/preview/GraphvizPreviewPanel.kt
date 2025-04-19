@@ -1,5 +1,6 @@
 package io.github.abpubli.dotsupport.editor.preview
 
+import DotExecutionResult
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -7,13 +8,16 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import guru.nidi.graphviz.engine.Format
 import guru.nidi.graphviz.engine.Graphviz
-import guru.nidi.graphviz.engine.GraphvizException // Import GraphvizException
+import guru.nidi.graphviz.engine.GraphvizException
+import runDotCommand
 import java.awt.BorderLayout
 import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
 import java.util.concurrent.Future
-import java.util.regex.Pattern // Import Pattern for parsing
+import java.util.concurrent.TimeoutException
+import java.util.regex.Pattern
+import javax.imageio.ImageIO
 import javax.swing.*
 
 /**
@@ -26,12 +30,14 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
 
     private companion object {
         private val LOG = Logger.getInstance(GraphvizPreviewPanel::class.java)
+
         // Regex pattern also used here for parsing a concise error message for the status label.
         // Duplicated from Annotator for now, could be refactored into a shared utility.
         private val ISSUE_PATTERN: Pattern = Pattern.compile(
             "^(Error|Warning):\\s*(?:.*?:)?\\s*(?:line|near line)\\s*(\\d+)(.*)",
             Pattern.CASE_INSENSITIVE
         )
+
         // Limit message parsing length for performance/log readability
         private const val MAX_STDERR_PARSE_LENGTH = 5000
         private const val MAX_CONCISE_MESSAGE_LENGTH = 150
@@ -69,91 +75,137 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
      * @param force If `true`, forces rendering even if `dotText` is identical to `lastRenderedText`.
      */
     fun triggerUpdate(dotText: String, force: Boolean = false) {
+        // TRACE logs for entry, skip check, proceeding are here (levels assumed set previously)
         LOG.trace("triggerUpdate called. Force: $force, New text length: ${dotText.length}, Last text length: ${lastRenderedText?.length}")
-
         if (!force && dotText == lastRenderedText) {
             LOG.trace("Skipping render: Text unchanged and force=false.")
             return
         }
-
         LOG.trace("Proceeding with preview update.")
-        LOG.debug("Setting status to 'Rendering...'")
-        showStatus("Rendering...") // showStatus wewnętrznie loguje na DEBUG
-
+        LOG.debug("Setting status to 'Rendering...'") // Added DEBUG log
+        showStatus("Rendering...")
         lastRenderingTask?.cancel(true)
         LOG.debug("Previous rendering task cancelled (if running).")
 
-        // Reset error state before starting background task
-        errorToDisplay = null
-        var renderedImage: BufferedImage? = null // Use local variable in task scope
+        errorToDisplay = null // Reset error state
 
         lastRenderingTask = ApplicationManager.getApplication().executeOnPooledThread {
-            LOG.debug("Background thread [${Thread.currentThread().id}]: Starting Graphviz rendering.")
+            LOG.debug("Background thread [${Thread.currentThread().id}]: Starting direct 'dot -Tpng' execution.")
 
+            var executionResult: DotExecutionResult? = null
             try {
                 if (Thread.currentThread().isInterrupted) {
-                    LOG.debug("Background thread [${Thread.currentThread().id}]: Task cancelled before rendering.")
+                    LOG.debug("Background thread [${Thread.currentThread().id}]: Task cancelled before 'dot' execution.")
                     return@executeOnPooledThread
                 }
 
-                // Attempt to render to PNG image.
-                renderedImage = Graphviz.fromString(dotText)
-                    .render(Format.PNG)
-                    .toImage()
+                // Call dot with PNG format and potentially longer timeout
+                executionResult = runDotCommand(dotText, "png", 15) // 15 second timeout for rendering
 
-                if (renderedImage == null && !Thread.currentThread().isInterrupted) {
-                    // Graphviz might return null without exception in some cases.
-                    throw IllegalStateException("Graphviz rendering returned a null image.")
+                if (Thread.currentThread().isInterrupted) {
+                    LOG.debug("Background thread [${Thread.currentThread().id}]: Task cancelled after 'dot' execution.")
+                    return@executeOnPooledThread
                 }
 
-                lastRenderedText = dotText // Store text on success
-                LOG.info("Graphviz rendering successful on thread [${Thread.currentThread().id}].")
-
-            } catch (e: Exception) {
-                // --- Modified Error Handling ---
-                if (e is InterruptedException || Thread.currentThread().isInterrupted) {
-                    LOG.debug("Background thread [${Thread.currentThread().id}]: Rendering cancelled/interrupted.", e)
-                    return@executeOnPooledThread // Exit, don't show error for cancellation.
+                // First, handle errors from the dot execution itself
+                if (executionResult.executionError != null) {
+                    throw executionResult.executionError // Rethrow so the main catch block handles it
+                }
+                if (executionResult.timedOut) {
+                    throw TimeoutException("Graphviz 'dot' rendering timed out.") // Rethrow so the main catch block handles it
                 }
 
-                // Store the text that caused the error regardless of type.
-                lastRenderedText = dotText
+                // Process the result - even if there are errors, we'll try to show the image if available
+                lastRenderedText = dotText // Save the text regardless of the outcome
 
-                if (e is GraphvizException) {
-                    // Handle Graphviz-specific errors: Log full error, prepare concise message for UI.
-                    LOG.warn("GraphvizException rendering preview on thread [${Thread.currentThread().id}]: ${e.message?.take(MAX_STDERR_PARSE_LENGTH)}", e)
-                    errorToDisplay = parseConciseErrorMessage(e.message) // Generate user-friendly message
-                } else {
-                    // Handle other unexpected exceptions during rendering.
-                    LOG.error("Unexpected error rendering Graphviz preview on thread [${Thread.currentThread().id}]: ${e.message}", e)
-                    errorToDisplay = e // Store the exception itself for generic display
-                }
-                // --- End Modified Error Handling ---
-            }
+                val imageBytes = executionResult.outputBytes
+                val errors = executionResult.errorOutput // Errors/warnings from stderr
+                val exitCode = executionResult.exitCode
+                val thisTaskFuture = lastRenderingTask // Capture the Future for THIS task
 
-            // Update UI on EDT, check for cancellation again.
-            if (!Thread.currentThread().isInterrupted) {
-                val finalError = errorToDisplay // Capture volatile field for EDT task
-                val finalImage = renderedImage // Capture local variable for EDT task
+                LOG.debug("Direct 'dot' execution finished. Exit code: $exitCode, Stderr present: ${!errors.isNullOrBlank()}, Output bytes: ${imageBytes?.size}")
 
+                // Pass results to the UI thread (EDT)
                 SwingUtilities.invokeLater {
-                    if (finalError != null) {
-                        // Display error based on what was stored in errorToDisplay
-                        val errorMessage = when(finalError) {
-                            is String -> finalError // Use the pre-parsed concise message
-                            is Exception -> finalError.localizedMessage ?: finalError.javaClass.simpleName // Generic message from other exceptions
-                            else -> "Unknown error occurred"
-                        }
-                        showError(errorMessage)
-                    } else if (finalImage != null) {
-                        updateImage(finalImage)
-                    } else {
-                        // Handle case where image is null but no error was stored (e.g., cancelled late)
-                        showError("Rendering did not produce an image or was cancelled.")
+                    // Compare the reference of THIS task with the CURRENT value of lastRenderingTask in the panel
+                    // AND check if THIS task was cancelled
+                    if (thisTaskFuture != this@GraphvizPreviewPanel.lastRenderingTask || thisTaskFuture?.isCancelled == true) {
+                        LOG.debug("Successful UI update skipped because task was cancelled or superseded by a newer one.")
+                        return@invokeLater
                     }
+
+
+                    var errorMessageToDisplay: String? = null
+                    // Check stderr and exit code
+                    if (!errors.isNullOrBlank()) {
+                        // Use existing parsing logic for a concise message
+                        errorMessageToDisplay = parseConciseErrorMessage(errors)
+                        if (exitCode != 0) errorMessageToDisplay += " (Exit code: $exitCode)"
+                        LOG.warn("Graphviz stderr reported during rendering: $errors")
+                    } else if (exitCode != 0) {
+                        errorMessageToDisplay = "Graphviz 'dot' failed with exit code $exitCode."
+                        LOG.warn(errorMessageToDisplay)
+                    }
+
+                    var imageDisplayed = false
+                    // Try to display the image if data is available
+                    if (imageBytes != null && imageBytes.isNotEmpty()) {
+                        try {
+                            val image = ImageIO.read(ByteArrayInputStream(imageBytes))
+                            if (image != null) {
+                                updateImage(image) // This method sets the success status
+                                imageDisplayed = true
+                                // If there were warnings (stderr not empty), but the image was rendered,
+                                // we can log them or briefly show a status like "completed with warnings".
+                                if (!errors.isNullOrBlank()) {
+                                    // Update the status after loading the image
+                                    showStatus("Completed (with warnings - check log)")
+                                }
+                            } else {
+                                // Data was present, but ImageIO failed to decode
+                                LOG.warn("Rendered image data could not be decoded.")
+                                if (errorMessageToDisplay == null) errorMessageToDisplay =
+                                    "Failed to decode rendered image."
+                            }
+                        } catch (e: Exception) {
+                            LOG.error("Error decoding rendered image data.", e)
+                            if (errorMessageToDisplay == null) errorMessageToDisplay =
+                                "Error decoding image: ${e.message}"
+                        }
+                    }
+
+                    // If the image was not displayed, show the error (if any)
+                    if (!imageDisplayed) {
+                        if (!errorMessageToDisplay.isNullOrBlank()) {
+                            showError(errorMessageToDisplay)
+                        } else {
+                            // No image and no specific error (e.g., dot returned 0, empty stdout/stderr?)
+                            showError("Rendering produced no image or failed silently.")
+                        }
+                    }
+                } // End invokeLater
+
+            } catch (e: Exception) { // Catches execution errors, timeouts, etc.
+                if (e is InterruptedException || Thread.currentThread().isInterrupted) {
+                    LOG.debug(
+                        "Background thread [${Thread.currentThread().id}]: Direct 'dot' execution cancelled/interrupted in outer catch.",
+                        e
+                    )
+                    return@executeOnPooledThread // Don't show an error for cancellation
                 }
-            } else {
-                LOG.debug("Background thread [${Thread.currentThread().id}]: UI update skipped due to cancellation.")
+                LOG.error("Error executing or processing 'dot' command for preview.", e)
+                val finalError = e // Capture for invokeLater
+                val thisTaskFuture = lastRenderingTask // Capture the Future for THIS task
+                SwingUtilities.invokeLater {
+                    // Compare the reference of THIS task with the CURRENT value of lastRenderingTask in the panel
+                    // AND check if THIS task was cancelled
+                    if (thisTaskFuture != this@GraphvizPreviewPanel.lastRenderingTask || thisTaskFuture?.isCancelled == true) {
+                        LOG.debug("Error UI update skipped because task was cancelled or superseded by a newer one.")
+                        return@invokeLater
+                    }
+                    // Show execution error (e.g., dot not found, timeout)
+                    showError("Failed to run/process Graphviz 'dot': ${finalError.message}")
+                }
             }
         } // End executeOnPooledThread
     } // End triggerUpdate

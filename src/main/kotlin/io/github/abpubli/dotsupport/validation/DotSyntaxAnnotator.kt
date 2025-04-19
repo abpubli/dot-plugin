@@ -1,18 +1,14 @@
 package io.github.abpubli.dotsupport.validation
 
+// Imports for Graphviz rendering and exception
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.editor.Document // Required for apply method access
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
-// Imports for Graphviz rendering and exception
-import guru.nidi.graphviz.engine.Format
-import guru.nidi.graphviz.engine.Graphviz
-import guru.nidi.graphviz.engine.GraphvizException
-import java.awt.image.BufferedImage // Import needed for toImage() return type
+import runDotCommand
 import java.util.regex.Pattern
 
 /**
@@ -27,6 +23,7 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
 
     companion object {
         private val LOG = Logger.getInstance(DotSyntaxAnnotator::class.java)
+
         init {
             LOG.info("DotSyntaxAnnotator CLASS LOADED")
         }
@@ -39,6 +36,7 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
             "^(Error|Warning):\\s*(?:.*?:)?\\s*(?:line|near line)\\s*(\\d+)(.*)",
             Pattern.CASE_INSENSITIVE
         )
+
         // Limit message parsing length
         private const val MAX_EXCEPTION_MESSAGE_PARSE_LENGTH = 5000
     }
@@ -83,69 +81,93 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
             return DotValidationResult(emptyList())
         }
 
-        LOG.debug("Starting background annotation (PNG render attempt) for document text length ${collectedInfo!!.text.length}")
+        LOG.debug("Starting background annotation (direct 'dot -Tcanon' execution) for document text length ${collectedInfo.text.length}")
 
         val issues = mutableListOf<DotIssueInfo>()
-        var graphvizExceptionOccurred = false // Simple flag
+        var stderrOutput: String? = null // for logging in case of problems
 
         try {
-            LOG.debug("DotSyntaxAnnotator: Entering Graphviz try block (attempting PNG render)")
+            // call dot with a format that forces parsing, such as canon (or dot)
+            // use a shorter timeout for validation than for image rendering
+            val result = runDotCommand(collectedInfo.text, "canon", 5) // 5 second timeout
 
-            // Attempt to render to PNG. We primarily care if this throws an exception.
-            // We store the result just to ensure the operation is fully attempted.
-            @Suppress("UNUSED_VARIABLE") // We don't use the image, just check for exceptions
-            val renderedImage: BufferedImage? =
-                Graphviz.fromString(collectedInfo!!.text) // Use non-null assertion
-                    .render(Format.PNG) // Render as PNG, like the preview
-                    .toImage()
+            stderrOutput = result.errorOutput // keep stderr for logging/parsing
 
-            // If control reaches here, the library did not throw GraphvizException.
-            // Assume syntax is OK *as far as this check can tell*.
-            LOG.debug("DotSyntaxAnnotator: Graphviz PNG render call finished without throwing GraphvizException.")
+            // 1. check execution errors (e.g., 'dot' not found)
+            if (result.executionError != null) {
+                LOG.error("Failed to execute 'dot' command for validation.", result.executionError)
+                issues.add(
+                    DotIssueInfo(
+                        HighlightSeverity.ERROR,
+                        1,
+                        "Failed to execute Graphviz 'dot'. Is it installed and in PATH? Error: ${result.executionError.message}"
+                    )
+                )
+            }
+            // 2. check timeout
+            else if (result.timedOut) {
+                LOG.warn("'dot' command timed out during validation.")
+                issues.add(DotIssueInfo(HighlightSeverity.WARNING, 1, "Graphviz 'dot' validation timed out."))
+            }
+            // 3. if there were no execution/timeout errors, analyze stderr and exit code
+            else {
+                // parse stderr for errors/warnings
+                if (!stderrOutput.isNullOrBlank()) {
+                    stderrOutput.lines().forEach { line ->
+                        val matcher = ISSUE_PATTERN.matcher(line.trim()) // use the existing regex
+                        if (matcher.find()) {
+                            try {
+                                val type = matcher.group(1)
+                                val lineNumberStr = matcher.group(2)
+                                // use full line as message for tooltip
+                                val message = line.trim()
+                                val lineNumber = lineNumberStr?.toIntOrNull()
 
-        } catch (e: GraphvizException) {
-            // This block executes ONLY if .render(Format.PNG).toImage() throws.
-            graphvizExceptionOccurred = true
-            LOG.warn("DotSyntaxAnnotator: GraphvizException caught during PNG render! Parsing message...")
-            val errorMessage = e.message?.take(MAX_EXCEPTION_MESSAGE_PARSE_LENGTH) ?: ""
-
-            // --- Parse the exception message for error/warning lines ---
-            errorMessage.lines().forEach { line ->
-                val matcher = ISSUE_PATTERN.matcher(line.trim())
-                if (matcher.find()) {
-                    try {
-                        val type = matcher.group(1)
-                        val lineNumberStr = matcher.group(2)
-                        val message = line.trim()
-                        val lineNumber = lineNumberStr?.toIntOrNull()
-
-                        if (lineNumber != null) {
-                            val severity = when (type.lowercase()) {
-                                "error" -> HighlightSeverity.ERROR
-                                "warning" -> HighlightSeverity.WARNING
-                                else -> HighlightSeverity.WEAK_WARNING
+                                if (lineNumber != null) {
+                                    val severity = when (type.lowercase()) {
+                                        "error" -> HighlightSeverity.ERROR
+                                        "warning" -> HighlightSeverity.WARNING
+                                        else -> HighlightSeverity.WEAK_WARNING
+                                    }
+                                    issues.add(DotIssueInfo(severity, lineNumber, message))
+                                    LOG.debug("Found issue from stderr: $type on line $lineNumber")
+                                } else {
+                                    LOG.warn("Matched issue pattern in stderr but failed to parse line number from: '$line'")
+                                }
+                            } catch (parseEx: Exception) {
+                                LOG.warn("Failed to parse details from Graphviz stderr issue line: '$line'", parseEx)
                             }
-                            issues.add(DotIssueInfo(severity, lineNumber, message))
-                            LOG.debug("DotSyntaxAnnotator: Found and added issue from Exception: $type on line $lineNumber")
-                        } else {
-                            LOG.warn("DotSyntaxAnnotator: Matched issue pattern in Exception but failed to parse line number from: '$line'")
                         }
-                    } catch (parseEx: Exception) {
-                        LOG.warn("DotSyntaxAnnotator: Failed to parse details from GraphvizException issue line: '$line'", parseEx)
                     }
-                } // End if matcher.find()
-            } // End forEach line
-            LOG.debug("DotSyntaxAnnotator: Finished parsing GraphvizException message. Added ${issues.size} issues.")
-            // --- End of parsing logic ---
+                    LOG.debug("Parsed ${issues.size} specific issues from stderr.")
+                }
+
+                // In addition, if the output code is different from 0, and we have not parsed any ERROR errors,
+                // add a generic error. Sometimes dot ends up with an error without a specific message on stderr.
+                if (result.exitCode != 0 && issues.none { it.severity == HighlightSeverity.ERROR }) {
+                    val genericErrorMessage = "Graphviz 'dot' failed with exit code ${result.exitCode}."
+                    LOG.warn(genericErrorMessage + (if (!stderrOutput.isNullOrBlank()) " Stderr: $stderrOutput" else ""))
+                    issues.add(
+                        DotIssueInfo(
+                            HighlightSeverity.ERROR,
+                            1,
+                            genericErrorMessage + " Check logs for details."
+                        )
+                    )
+                }
+                // Log stderr if it was not empty, but no specific problems found
+                if (!stderrOutput.isNullOrBlank() && issues.isEmpty() && result.exitCode != 0) {
+                    LOG.warn("dot stderr for exit code ${result.exitCode} (no specific issues parsed): $stderrOutput")
+                }
+            }
 
         } catch (e: Exception) {
-            // Catch other unexpected exceptions during the rendering attempt.
-            LOG.error("DotSyntaxAnnotator: Unexpected exception during Graphviz PNG render call", e)
-            graphvizExceptionOccurred = true // Mark that some failure occurred
+            // catch other unexpected exceptions during the call process itself
+            LOG.error("Unexpected exception during direct 'dot' execution handling for validation.", e)
+            issues.add(DotIssueInfo(HighlightSeverity.ERROR, 1, "Internal error during validation: ${e.message}"))
         }
 
-        // Log the final result.
-        LOG.debug("DotSyntaxAnnotator: doAnnotate RETURNING result with ${issues.size} issues. (GraphvizException occurred: $graphvizExceptionOccurred)")
+        LOG.debug("doAnnotate (direct dot) returning result with ${issues.size} issues.")
         return DotValidationResult(issues)
     }
 
