@@ -28,7 +28,7 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
     companion object {
         private val LOG = Logger.getInstance(DotSyntaxAnnotator::class.java)
         init {
-            LOG.info("!!! DotSyntaxAnnotator CLASS LOADED !!!")
+            LOG.info("DotSyntaxAnnotator CLASS LOADED")
         }
 
         /**
@@ -44,19 +44,19 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
     }
 
     init {
-        LOG.info("!!! DotSyntaxAnnotator INSTANCE CREATED !!!")
+        LOG.info("DotSyntaxAnnotator INSTANCE CREATED")
     }
 
     /**
      * Collects necessary information (file text and document) from the UI thread.
      */
     override fun collectInformation(file: PsiFile, editor: Editor, hasErrors: Boolean): DotFileInfo? {
-        LOG.info("!!! DotSyntaxAnnotator: collectInformation CALLED for ${file.name} !!!")
+        LOG.debug("DotSyntaxAnnotator: collectInformation CALLED for ${file.name}")
         try {
             val document = editor.document
             val text = document.text
             val info = DotFileInfo(text, document)
-            LOG.info("!!! DotSyntaxAnnotator: collectInformation RETURNING info for ${file.name} !!!")
+            LOG.debug("DotSyntaxAnnotator: collectInformation RETURNING info for ${file.name}")
             return info
         } catch (e: Throwable) {
             LOG.error("Error inside collectInformation for ${file.name}", e)
@@ -72,9 +72,9 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
      * @return DotValidationResult containing issues parsed from GraphvizException, or empty list if no exception.
      */
     override fun doAnnotate(collectedInfo: DotFileInfo?): DotValidationResult? {
-        LOG.info("!!! DotSyntaxAnnotator: doAnnotate CALLED (info is null: ${collectedInfo == null}) !!!")
+        LOG.debug("DotSyntaxAnnotator: doAnnotate CALLED (info is null: ${collectedInfo == null})")
         if (collectedInfo == null) {
-            LOG.warn("!!! DotSyntaxAnnotator: doAnnotate returning NULL because collectedInfo is null !!!")
+            LOG.warn("DotSyntaxAnnotator: doAnnotate returning NULL because collectedInfo is null")
             return null
         }
         // Avoid processing potentially huge files
@@ -89,7 +89,7 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
         var graphvizExceptionOccurred = false // Simple flag
 
         try {
-            LOG.debug(">>> DotSyntaxAnnotator: Entering Graphviz try block (attempting PNG render) <<<")
+            LOG.debug("DotSyntaxAnnotator: Entering Graphviz try block (attempting PNG render)")
 
             // Attempt to render to PNG. We primarily care if this throws an exception.
             // We store the result just to ensure the operation is fully attempted.
@@ -101,12 +101,12 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
 
             // If control reaches here, the library did not throw GraphvizException.
             // Assume syntax is OK *as far as this check can tell*.
-            LOG.info(">>> DotSyntaxAnnotator: Graphviz PNG render call finished without throwing GraphvizException.")
+            LOG.debug("DotSyntaxAnnotator: Graphviz PNG render call finished without throwing GraphvizException.")
 
         } catch (e: GraphvizException) {
             // This block executes ONLY if .render(Format.PNG).toImage() throws.
             graphvizExceptionOccurred = true
-            LOG.warn(">>> DotSyntaxAnnotator: GraphvizException caught during PNG render! Parsing message... <<<")
+            LOG.warn("DotSyntaxAnnotator: GraphvizException caught during PNG render! Parsing message...")
             val errorMessage = e.message?.take(MAX_EXCEPTION_MESSAGE_PARSE_LENGTH) ?: ""
 
             // --- Parse the exception message for error/warning lines ---
@@ -126,26 +126,26 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
                                 else -> HighlightSeverity.WEAK_WARNING
                             }
                             issues.add(DotIssueInfo(severity, lineNumber, message))
-                            LOG.debug(">>> DotSyntaxAnnotator: Found and added issue from Exception: $type on line $lineNumber <<<")
+                            LOG.debug("DotSyntaxAnnotator: Found and added issue from Exception: $type on line $lineNumber")
                         } else {
-                            LOG.warn(">>> DotSyntaxAnnotator: Matched issue pattern in Exception but failed to parse line number from: '$line'")
+                            LOG.warn("DotSyntaxAnnotator: Matched issue pattern in Exception but failed to parse line number from: '$line'")
                         }
                     } catch (parseEx: Exception) {
-                        LOG.warn(">>> DotSyntaxAnnotator: Failed to parse details from GraphvizException issue line: '$line'", parseEx)
+                        LOG.warn("DotSyntaxAnnotator: Failed to parse details from GraphvizException issue line: '$line'", parseEx)
                     }
                 } // End if matcher.find()
             } // End forEach line
-            LOG.info(">>> DotSyntaxAnnotator: Finished parsing GraphvizException message. Added ${issues.size} issues. <<<")
+            LOG.debug("DotSyntaxAnnotator: Finished parsing GraphvizException message. Added ${issues.size} issues.")
             // --- End of parsing logic ---
 
         } catch (e: Exception) {
             // Catch other unexpected exceptions during the rendering attempt.
-            LOG.error("!!! DotSyntaxAnnotator: Unexpected exception during Graphviz PNG render call !!!", e)
+            LOG.error("DotSyntaxAnnotator: Unexpected exception during Graphviz PNG render call", e)
             graphvizExceptionOccurred = true // Mark that some failure occurred
         }
 
         // Log the final result.
-        LOG.info("!!! DotSyntaxAnnotator: doAnnotate RETURNING result with ${issues.size} issues. (GraphvizException occurred: $graphvizExceptionOccurred) !!!")
+        LOG.debug("DotSyntaxAnnotator: doAnnotate RETURNING result with ${issues.size} issues. (GraphvizException occurred: $graphvizExceptionOccurred)")
         return DotValidationResult(issues)
     }
 
@@ -160,7 +160,7 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
      */
     override fun apply(file: PsiFile, annotationResult: DotValidationResult?, holder: AnnotationHolder) {
         // Log entry includes issue count from the result for clarity
-        LOG.info("!!! DotSyntaxAnnotator: apply CALLED for ${file.name} (result is null: ${annotationResult == null}, issue count: ${annotationResult?.issues?.size ?: "N/A"}) !!!")
+        LOG.debug("DotSyntaxAnnotator: apply CALLED for ${file.name} (result is null: ${annotationResult == null}, issue count: ${annotationResult?.issues?.size ?: "N/A"})")
 
         if (annotationResult == null || annotationResult.issues.isEmpty()) {
             LOG.debug("No issues found or annotation result is null for ${file.name}. No annotations to apply.")

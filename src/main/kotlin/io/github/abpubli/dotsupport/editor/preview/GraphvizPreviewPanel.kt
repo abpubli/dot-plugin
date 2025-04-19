@@ -69,15 +69,17 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
      * @param force If `true`, forces rendering even if `dotText` is identical to `lastRenderedText`.
      */
     fun triggerUpdate(dotText: String, force: Boolean = false) {
-        LOG.debug("triggerUpdate called. Force: $force, New text length: ${dotText.length}, Last text length: ${lastRenderedText?.length}")
+        LOG.trace("triggerUpdate called. Force: $force, New text length: ${dotText.length}, Last text length: ${lastRenderedText?.length}")
 
         if (!force && dotText == lastRenderedText) {
-            LOG.debug("Skipping render: Text unchanged and force=false.")
+            LOG.trace("Skipping render: Text unchanged and force=false.")
             return
         }
 
-        LOG.debug("Proceeding with preview update.")
-        showStatus("Rendering...")
+        LOG.trace("Proceeding with preview update.")
+        LOG.debug("Setting status to 'Rendering...'")
+        showStatus("Rendering...") // showStatus wewnętrznie loguje na DEBUG
+
         lastRenderingTask?.cancel(true)
         LOG.debug("Previous rendering task cancelled (if running).")
 

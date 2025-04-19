@@ -64,8 +64,6 @@ class GraphvizPreviewFileEditor(
      * @param force If true, indicates that the update should be performed even if optimizations might otherwise skip it (e.g., if text content appears unchanged). The panel implementation determines how this flag is used.
      */
     fun triggerPreviewUpdate(dotText: String, force: Boolean = false) {
-        // Log the request using IDE's logging framework instead of println
-        LOG.info("Preview update triggered for file: ${virtualFile.name}")
         // Delegate the rendering logic to the preview panel
         previewPanel.triggerUpdate(dotText, force)
     }
