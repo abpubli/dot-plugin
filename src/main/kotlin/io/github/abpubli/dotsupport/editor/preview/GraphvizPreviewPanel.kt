@@ -9,9 +9,11 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import guru.nidi.graphviz.engine.Format
 import guru.nidi.graphviz.engine.Graphviz
+import guru.nidi.graphviz.engine.GraphvizException // Import GraphvizException
 import java.awt.BorderLayout
 import java.awt.image.BufferedImage
 import java.util.concurrent.Future
+import java.util.regex.Pattern // Import Pattern for parsing
 import javax.swing.*
 
 /**
@@ -22,45 +24,46 @@ import javax.swing.*
  */
 class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
 
-    // Logger instance for this class
     private companion object {
         private val LOG = Logger.getInstance(GraphvizPreviewPanel::class.java)
+        // Regex pattern also used here for parsing a concise error message for the status label.
+        // Duplicated from Annotator for now, could be refactored into a shared utility.
+        private val ISSUE_PATTERN: Pattern = Pattern.compile(
+            "^(Error|Warning):\\s*(?:.*?:)?\\s*(?:line|near line)\\s*(\\d+)(.*)",
+            Pattern.CASE_INSENSITIVE
+        )
+        // Limit message parsing length for performance/log readability
+        private const val MAX_STDERR_PARSE_LENGTH = 5000
+        private const val MAX_CONCISE_MESSAGE_LENGTH = 150
     }
 
-    // Field to hold the reference to the background rendering task
-    @Volatile // Ensure visibility across threads
+    @Volatile
     private var lastRenderingTask: Future<*>? = null
-
-    private val imageLabel: JLabel = JLabel() // Label to display the rendered Graphviz image
-    private val statusLabel: JBLabel =
-        JBLabel("", SwingConstants.CENTER) // Label for status messages (e.g., "Rendering...") or errors
-    private val scrollPane: JBScrollPane // Scroll pane to make the image view scrollable
-
-    // Stores the DOT text of the last successfully rendered or attempted render
-    // Used for optimization to avoid re-rendering unchanged text.
+    private val imageLabel: JLabel = JLabel()
+    private val statusLabel: JBLabel = JBLabel("", SwingConstants.CENTER)
+    private val scrollPane: JBScrollPane
     private var lastRenderedText: String? = null
 
+    // Field to store the error information to be displayed in the UI thread.
+    // Can be Exception or a specific String message.
+    @Volatile
+    private var errorToDisplay: Any? = null
+
     init {
-        // Center the image within the label
         imageLabel.horizontalAlignment = SwingConstants.CENTER
         imageLabel.verticalAlignment = SwingConstants.CENTER
-
-        // Place the image label inside a scroll pane
         scrollPane = JBScrollPane(imageLabel)
-        add(scrollPane, BorderLayout.CENTER) // Add scroll pane to the center
-
-        // Configure and add the status label at the bottom
-        statusLabel.border = JBUI.Borders.empty(5) // Add some padding
+        add(scrollPane, BorderLayout.CENTER)
+        statusLabel.border = JBUI.Borders.empty(5)
         add(statusLabel, BorderLayout.SOUTH)
-
-        showStatus("Waiting for data...") // Set initial status message
+        showStatus("Waiting for data...")
     }
 
     /**
      * Initiates the rendering process for the provided DOT text.
-     * Rendering is performed on a background thread to avoid blocking the UI thread.
-     * Includes an optimization to skip rendering if the text has not changed since the last attempt, unless forced.
-     * Cancels any previous rendering task that might still be running.
+     * Rendering is performed on a background thread. Skips rendering if text is unchanged (unless forced).
+     * Cancels any previous rendering task. Handles [GraphvizException] specifically
+     * to display a more concise error message in the status label.
      *
      * @param dotText The DOT source text to render.
      * @param force If `true`, forces rendering even if `dotText` is identical to `lastRenderedText`.
@@ -68,89 +71,84 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
     fun triggerUpdate(dotText: String, force: Boolean = false) {
         LOG.debug("triggerUpdate called. Force: $force, New text length: ${dotText.length}, Last text length: ${lastRenderedText?.length}")
 
-        // Optimization: Avoid re-rendering if the text is identical and not forced
         if (!force && dotText == lastRenderedText) {
             LOG.debug("Skipping render: Text unchanged and force=false.")
-            // Optionally update status if image already exists, otherwise keep current status/error
-            if (imageLabel.icon != null) {
-                // Keep the successful image, maybe just update status slightly if needed
-                // showStatus("Preview up-to-date") // Example status
-            }
-            return // Do not proceed with rendering
+            return
         }
 
         LOG.debug("Proceeding with preview update.")
-        // Display "Rendering..." message immediately on the EDT
         showStatus("Rendering...")
-
-        // Cancel any previously running rendering task
-        // Use '?' for safety, though it should ideally not be null if a task was started
-        // 'true' attempts to interrupt the thread if it's running
         lastRenderingTask?.cancel(true)
         LOG.debug("Previous rendering task cancelled (if running).")
 
-        // Execute the potentially time-consuming rendering task on a background thread
-        // Store the Future reference to allow cancellation later
+        // Reset error state before starting background task
+        errorToDisplay = null
+        var renderedImage: BufferedImage? = null // Use local variable in task scope
+
         lastRenderingTask = ApplicationManager.getApplication().executeOnPooledThread {
             LOG.debug("Background thread [${Thread.currentThread().id}]: Starting Graphviz rendering.")
-            var renderedImage: BufferedImage? = null // Store result locally
-            var error: Exception? = null // Store error locally
 
             try {
-                // Check if the task was cancelled before starting the heavy work
                 if (Thread.currentThread().isInterrupted) {
                     LOG.debug("Background thread [${Thread.currentThread().id}]: Task cancelled before rendering.")
-                    return@executeOnPooledThread // Exit the runnable
+                    return@executeOnPooledThread
                 }
 
-                // Attempt to render the DOT text to a PNG image using the default engine
+                // Attempt to render to PNG image.
                 renderedImage = Graphviz.fromString(dotText)
                     .render(Format.PNG)
-                    .toImage() // Note: toImage() can return null in some failure cases
+                    .toImage()
 
-                // Check if rendering actually produced an image (and wasn't cancelled during render)
                 if (renderedImage == null && !Thread.currentThread().isInterrupted) {
-                    throw IllegalStateException("Graphviz rendering returned a null image. Check DOT syntax or Graphviz setup.")
+                    // Graphviz might return null without exception in some cases.
+                    throw IllegalStateException("Graphviz rendering returned a null image.")
                 }
 
-                // Successfully rendered, store the text for future comparison
-                // Do this *before* updating UI in case another trigger comes quickly
-                lastRenderedText = dotText
+                lastRenderedText = dotText // Store text on success
                 LOG.info("Graphviz rendering successful on thread [${Thread.currentThread().id}].")
 
             } catch (e: Exception) {
-                // Check if cancellation is the root cause
+                // --- Modified Error Handling ---
                 if (e is InterruptedException || Thread.currentThread().isInterrupted) {
                     LOG.debug("Background thread [${Thread.currentThread().id}]: Rendering cancelled/interrupted.", e)
-                    // Don't treat cancellation as a rendering error to show to the user
-                    return@executeOnPooledThread // Exit the runnable
+                    return@executeOnPooledThread // Exit, don't show error for cancellation.
                 }
-                // Log actual rendering errors using WARN level, include the exception
-                LOG.warn("Error rendering Graphviz preview on thread [${Thread.currentThread().id}]: ${e.message}", e)
-                // Store the text that caused the error to prevent immediate re-tries if unchanged
+
+                // Store the text that caused the error regardless of type.
                 lastRenderedText = dotText
-                error = e // Store the error to pass to the EDT
+
+                if (e is GraphvizException) {
+                    // Handle Graphviz-specific errors: Log full error, prepare concise message for UI.
+                    LOG.warn("GraphvizException rendering preview on thread [${Thread.currentThread().id}]: ${e.message?.take(MAX_STDERR_PARSE_LENGTH)}", e)
+                    errorToDisplay = parseConciseErrorMessage(e.message) // Generate user-friendly message
+                } else {
+                    // Handle other unexpected exceptions during rendering.
+                    LOG.error("Unexpected error rendering Graphviz preview on thread [${Thread.currentThread().id}]: ${e.message}", e)
+                    errorToDisplay = e // Store the exception itself for generic display
+                }
+                // --- End Modified Error Handling ---
             }
 
-            // Update the UI on the Event Dispatch Thread (EDT)
-            // Check again for cancellation before queuing UI update
+            // Update UI on EDT, check for cancellation again.
             if (!Thread.currentThread().isInterrupted) {
+                val finalError = errorToDisplay // Capture volatile field for EDT task
+                val finalImage = renderedImage // Capture local variable for EDT task
+
                 SwingUtilities.invokeLater {
-                    // Check if this specific task instance is still the active one
-                    // (Although cancellation should prevent this, it's an extra safety layer)
-                    // if (lastRenderingTask != null && !lastRenderingTask!!.isCancelled ) { // Requires storing the Future from outside
-                    if (error != null) {
-                        showError(error.localizedMessage ?: error.javaClass.simpleName)
-                    } else if (renderedImage != null) {
-                        updateImage(renderedImage)
+                    if (finalError != null) {
+                        // Display error based on what was stored in errorToDisplay
+                        val errorMessage = when(finalError) {
+                            is String -> finalError // Use the pre-parsed concise message
+                            is Exception -> finalError.localizedMessage ?: finalError.javaClass.simpleName // Generic message from other exceptions
+                            else -> "Unknown error occurred"
+                        }
+                        showError(errorMessage)
+                    } else if (finalImage != null) {
+                        updateImage(finalImage)
                     } else {
-                        // This case might happen if rendering yielded null but no exception,
-                        // or was cancelled but somehow reached here.
+                        // Handle case where image is null but no error was stored (e.g., cancelled late)
                         showError("Rendering did not produce an image or was cancelled.")
                     }
-                    // } else {
-                    //    LOG.debug("UI update skipped as the task was cancelled or superseded.")
-                    // }
                 }
             } else {
                 LOG.debug("Background thread [${Thread.currentThread().id}]: UI update skipped due to cancellation.")
@@ -161,72 +159,82 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
 
     override fun dispose() {
         LOG.debug("Disposing GraphvizPreviewPanel")
-        // Anuluj aktywne zadanie renderowania, jeśli istnieje
-        // lastRenderingTask?.cancel(true)
-        // lastRenderingTask = null
-
-        // Wyczyść zasoby, np. ikonę
+        lastRenderingTask?.cancel(true) // Cancel any active rendering task
+        lastRenderingTask = null
         imageLabel.icon = null
         lastRenderedText = null
-        // Ew. inne czyszczenie specyficzne dla biblioteki Graphviz
     }
 
-    /**
-     * Updates the UI to display the rendered Graphviz image.
-     * This method must be called on the Event Dispatch Thread (EDT).
-     *
-     * @param image The [BufferedImage] to display. Assumed not null by this point.
-     */
     private fun updateImage(image: BufferedImage) {
         imageLabel.icon = ImageIcon(image)
-        imageLabel.text = null // Clear any previous text (like error messages) from image label
-        statusLabel.text = "Rendering completed successfully" // Update status label
-        statusLabel.foreground = JBUI.CurrentTheme.Label.foreground() // Ensure default text color
+        imageLabel.text = null
+        statusLabel.text = "Rendering completed successfully"
+        statusLabel.foreground = JBUI.CurrentTheme.Label.foreground()
         statusLabel.isVisible = true
-        // Important: Revalidate the scroll pane in case the image size changed its preferred size
         scrollPane.revalidate()
         scrollPane.repaint()
         LOG.debug("Image updated in the preview panel.")
-        // Revalidate the whole panel too, just in case
         this.revalidate()
         this.repaint()
     }
 
     /**
      * Updates the UI to display an error message in the status label.
-     * Clears any existing image from the display.
-     * This method must be called on the Event Dispatch Thread (EDT).
-     *
+     * Clears any existing image from the display. Must be called on EDT.
      * @param message The error message to display.
      */
     fun showError(message: String) {
-        imageLabel.icon = null // Clear the image display area
-        imageLabel.text = null // Clear any text in image label
-        statusLabel.text = "Error: $message" // Display the error message (English prefix)
-        statusLabel.foreground = UIUtil.getErrorForeground() // Use standard IntelliJ error color
+        imageLabel.icon = null
+        imageLabel.text = null
+        statusLabel.text = "Error: $message" // Prefix with "Error: "
+        statusLabel.foreground = UIUtil.getErrorForeground()
         statusLabel.isVisible = true
         LOG.debug("Error message displayed in status label: '$message'")
-        // Revalidate the panel to reflect changes
+        this.revalidate()
+        this.repaint()
+    }
+
+    private fun showStatus(message: String) {
+        imageLabel.icon = null
+        imageLabel.text = null
+        statusLabel.text = message
+        statusLabel.foreground = JBUI.CurrentTheme.Label.foreground()
+        statusLabel.isVisible = true
+        LOG.debug("Status message displayed in status label: '$message'")
         this.revalidate()
         this.repaint()
     }
 
     /**
-     * Updates the UI to display a status message (e.g., "Rendering...", "Waiting for data...").
-     * Clears any existing image from the display.
-     * This method must be called on the Event Dispatch Thread (EDT).
-     *
-     * @param message The status message to display.
+     * Parses the potentially multi-line stderr output from a GraphvizException
+     * to extract a concise, single-line summary suitable for the status label.
+     * @param stderr The message content from GraphvizException (may be null).
+     * @return A concise string summarizing the first reported error/warning, or a default message.
      */
-    private fun showStatus(message: String) {
-        imageLabel.icon = null // Clear the image display area when showing status
-        imageLabel.text = null // Clear any text in image label
-        statusLabel.text = message // Display the status message
-        statusLabel.foreground = JBUI.CurrentTheme.Label.foreground() // Use standard text color
-        statusLabel.isVisible = true
-        LOG.debug("Status message displayed in status label: '$message'")
-        // Revalidate the panel to reflect changes
-        this.revalidate()
-        this.repaint()
+    private fun parseConciseErrorMessage(stderr: String?): String {
+        if (stderr == null) return "Unknown Graphviz error"
+
+        // Find the first line starting with "Error:" or "Warning:"
+        val firstIssueLine = stderr.lines().find {
+            val trimmed = it.trim()
+            trimmed.startsWith("Error:", ignoreCase = true) || trimmed.startsWith("Warning:", ignoreCase = true)
+        }
+
+        if (firstIssueLine != null) {
+            // Try to extract details using the regex for a slightly better message
+            val matcher = ISSUE_PATTERN.matcher(firstIssueLine.trim())
+            if (matcher.find()) {
+                val type = matcher.group(1) ?: "Issue"
+                val lineNum = matcher.group(2)
+                val details = matcher.group(3)?.trim()?.take(MAX_CONCISE_MESSAGE_LENGTH - 30) ?: "details unavailable"
+                return "$type on line $lineNum: $details"
+            }
+            // Fallback: return the first issue line itself if regex fails
+            return firstIssueLine.trim().take(MAX_CONCISE_MESSAGE_LENGTH)
+        }
+
+        // Fallback: return the beginning of the stderr if no specific issue line found
+        return stderr.trim().take(MAX_CONCISE_MESSAGE_LENGTH)
     }
-}
+
+} // End GraphvizPreviewPanel class

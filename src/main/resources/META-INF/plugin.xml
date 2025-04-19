@@ -19,8 +19,7 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-
-        <lang.Language language="DOT" implementationClass="io.github.abpubli.dotsupport.filetype.DotLanguage"/>
+        <externalAnnotator language="DOT" implementationClass="io.github.abpubli.dotsupport.validation.DotSyntaxAnnotator"/>
 
         <fileEditorProvider implementation="io.github.abpubli.dotsupport.editor.DotFileEditorProvider"/>
 
