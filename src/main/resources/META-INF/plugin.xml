@@ -1,0 +1,35 @@
+<idea-plugin>
+    <id>io.github.abpubli.dot-support</id>
+
+    <name>Dot Support</name>
+
+    <vendor email="twoj.email@example.com" url="https://github.com/andr1972">andr1972</vendor>
+    <description><![CDATA[
+    Provides editing and live preview support for Graphviz DOT language files (.dot).
+
+    <b>Features:</b>
+    <ul>
+      <li>Custom editor with integrated live preview panel.</li>
+      <li>Multiple view modes: Code Only, Split (Code and Preview), Preview Only.</li>
+      <li>Renders graphs using the native Graphviz engine (Graphviz installation may be required - see documentation).</li>
+    </ul>
+    Aims to provide a seamless workflow for viewing and editing DOT graph descriptions.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+
+        <lang.Language language="DOT" implementationClass="io.github.abpubli.dotsupport.filetype.DotLanguage"/>
+
+        <fileEditorProvider implementation="io.github.abpubli.dotsupport.editor.DotFileEditorProvider"/>
+
+        <fileType name="DOT file"
+                  implementationClass="io.github.abpubli.dotsupport.filetype.DotFileType"
+                  fieldName="INSTANCE"
+                  language="DOT"
+                  extensions="dot"/>
+
+    </extensions>
+
+</idea-plugin>

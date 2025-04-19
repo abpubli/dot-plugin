@@ -1,0 +1,32 @@
+graph pluginIcon {
+    graph [bgcolor="transparent", pad="0.2"];
+
+    node [
+        shape=ellipse,
+        style=filled,
+        penwidth=4,
+        width=0.7,
+        height=0.4,
+        fixedsize=true,
+        fontname="sans-serif",
+        fontsize=10
+    ];
+
+    edge [
+        penwidth=2,
+        color="#888888"
+    ];
+
+    A [fillcolor="#4A90E2"];
+    B [fillcolor="#50E3C2"];
+    C [fillcolor="#F5A623"];
+    D [fillcolor="#D0021B"];
+    E [fillcolor="#C0C0C0"];
+
+    A -- B;
+    A -- D;
+    A -- E;
+    B -- C;
+    D -- C;
+    E -- C;
+}
