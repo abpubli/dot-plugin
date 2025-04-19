@@ -3,7 +3,7 @@
 
     <name>Dot Support</name>
 
-    <vendor email="twoj.email@example.com" url="https://github.com/andr1972">andr1972</vendor>
+    <vendor email="borucki.andrzej@gmail.com" url="https://github.com/andr1972">Andrzej Borucki</vendor>
     <description><![CDATA[
     Provides editing and live preview support for Graphviz DOT language files (.dot).
 
