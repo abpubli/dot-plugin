@@ -22,8 +22,6 @@ dependencies {
     intellijPlatform {
         create("IC", "2025.1")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
-
-        implementation("guru.nidi:graphviz-java:0.18.1") // Sprawdź najnowszą wersję
     }
 }
 

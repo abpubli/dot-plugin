@@ -8,8 +8,6 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import guru.nidi.graphviz.engine.Graphviz
-import guru.nidi.graphviz.engine.GraphvizException
 import runDotCommand
 import java.awt.BorderLayout
 import java.awt.image.BufferedImage
