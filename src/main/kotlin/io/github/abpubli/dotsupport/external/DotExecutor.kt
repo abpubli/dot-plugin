@@ -5,6 +5,17 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.regex.Pattern
+
+
+/**
+ * Shared Regex pattern for parsing error/warnings lines from Graphviz (dot).
+ * Defined here to avoid duplication (DRY rule).
+ */
+internal val GRAPHVIZ_ISSUE_PATTERN: Pattern = Pattern.compile(
+    "^(Error|Warning):.*? (?:line|near line)\\s*(\\d+)(.*)", // Poprawiony wzorzec
+    Pattern.CASE_INSENSITIVE
+)
 
 // data class to storing results of dot command
 data class DotExecutionResult(

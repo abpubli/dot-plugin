@@ -8,6 +8,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import io.github.abpubli.dotsupport.external.DotExecutionResult
+import io.github.abpubli.dotsupport.external.GRAPHVIZ_ISSUE_PATTERN
 import io.github.abpubli.dotsupport.external.runDotCommand
 import java.awt.BorderLayout
 import java.awt.image.BufferedImage
@@ -28,14 +29,6 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
 
     private companion object {
         private val LOG = Logger.getInstance(GraphvizPreviewPanel::class.java)
-
-        // Regex pattern also used here for parsing a concise error message for the status label.
-        // Duplicated from Annotator for now, could be refactored into a shared utility.
-        private val ISSUE_PATTERN: Pattern = Pattern.compile(
-            "^(Error|Warning):.*? (?:line|near line)\\s*(\\d+)(.*)", // <-- Nowy regex
-            Pattern.CASE_INSENSITIVE
-        )
-
         // Limit message parsing length for performance/log readability
         private const val MAX_STDERR_PARSE_LENGTH = 5000
         private const val MAX_CONCISE_MESSAGE_LENGTH = 150
@@ -274,7 +267,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
 
         if (firstIssueLine != null) {
             // Try to extract details using the regex for a slightly better message
-            val matcher = ISSUE_PATTERN.matcher(firstIssueLine.trim())
+            val matcher = GRAPHVIZ_ISSUE_PATTERN.matcher(firstIssueLine.trim())
             if (matcher.find()) {
                 val type = matcher.group(1) ?: "Issue"
                 val lineNum = matcher.group(2)

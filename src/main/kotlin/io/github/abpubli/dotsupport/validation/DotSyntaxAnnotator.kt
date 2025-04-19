@@ -8,6 +8,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
+import io.github.abpubli.dotsupport.external.GRAPHVIZ_ISSUE_PATTERN
 import io.github.abpubli.dotsupport.external.runDotCommand
 import java.util.regex.Pattern
 
@@ -27,15 +28,6 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
         init {
             LOG.info("DotSyntaxAnnotator CLASS LOADED")
         }
-
-        /**
-         * Regex to parse Graphviz error/warning lines from GraphvizException message.
-         * Captures: Group 1=Type ("Error" or "Warning"), Group 2=Line Number, Group 3=Rest of message.
-         */
-        private val ISSUE_PATTERN: Pattern = Pattern.compile(
-            "^(Error|Warning):.*? (?:line|near line)\\s*(\\d+)(.*)",
-            Pattern.CASE_INSENSITIVE
-        )
 
         // Limit message parsing length
         private const val MAX_EXCEPTION_MESSAGE_PARSE_LENGTH = 5000
@@ -115,7 +107,7 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
                 if (!stderrOutput.isNullOrBlank()) {
                     stderrOutput.lines().forEach { line ->
                         val trimmedLine = line.trim()
-                        val matcher = ISSUE_PATTERN.matcher(trimmedLine)
+                        val matcher = GRAPHVIZ_ISSUE_PATTERN.matcher(trimmedLine)
                         if (matcher.find()) {
                             try {
                                 val type = matcher.group(1)
