@@ -1,6 +1,5 @@
 package io.github.abpubli.dotsupport.editor.preview
 
-import DotExecutionResult
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -8,7 +7,8 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import runDotCommand
+import io.github.abpubli.dotsupport.external.DotExecutionResult
+import io.github.abpubli.dotsupport.external.runDotCommand
 import java.awt.BorderLayout
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -32,7 +32,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         // Regex pattern also used here for parsing a concise error message for the status label.
         // Duplicated from Annotator for now, could be refactored into a shared utility.
         private val ISSUE_PATTERN: Pattern = Pattern.compile(
-            "^(Error|Warning):\\s*(?:.*?:)?\\s*(?:line|near line)\\s*(\\d+)(.*)",
+            "^(Error|Warning):.*? (?:line|near line)\\s*(\\d+)(.*)", // <-- Nowy regex
             Pattern.CASE_INSENSITIVE
         )
 

@@ -1,3 +1,5 @@
+package io.github.abpubli.dotsupport.external
+
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors

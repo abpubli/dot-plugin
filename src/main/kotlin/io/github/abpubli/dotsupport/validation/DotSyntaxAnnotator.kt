@@ -8,7 +8,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
-import runDotCommand
+import io.github.abpubli.dotsupport.external.runDotCommand
 import java.util.regex.Pattern
 
 /**
@@ -33,7 +33,7 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
          * Captures: Group 1=Type ("Error" or "Warning"), Group 2=Line Number, Group 3=Rest of message.
          */
         private val ISSUE_PATTERN: Pattern = Pattern.compile(
-            "^(Error|Warning):\\s*(?:.*?:)?\\s*(?:line|near line)\\s*(\\d+)(.*)",
+            "^(Error|Warning):.*? (?:line|near line)\\s*(\\d+)(.*)",
             Pattern.CASE_INSENSITIVE
         )
 
@@ -114,29 +114,35 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
                 // parse stderr for errors/warnings
                 if (!stderrOutput.isNullOrBlank()) {
                     stderrOutput.lines().forEach { line ->
-                        val matcher = ISSUE_PATTERN.matcher(line.trim()) // use the existing regex
+                        val trimmedLine = line.trim()
+                        val matcher = ISSUE_PATTERN.matcher(trimmedLine)
                         if (matcher.find()) {
                             try {
                                 val type = matcher.group(1)
                                 val lineNumberStr = matcher.group(2)
-                                // use full line as message for tooltip
-                                val message = line.trim()
+                                val message = trimmedLine
                                 val lineNumber = lineNumberStr?.toIntOrNull()
 
                                 if (lineNumber != null) {
                                     val severity = when (type.lowercase()) {
                                         "error" -> HighlightSeverity.ERROR
                                         "warning" -> HighlightSeverity.WARNING
-                                        else -> HighlightSeverity.WEAK_WARNING
+                                        else -> HighlightSeverity.WARNING
                                     }
-                                    issues.add(DotIssueInfo(severity, lineNumber, message))
-                                    LOG.debug("Found issue from stderr: $type on line $lineNumber")
+                                    val issueInfo = DotIssueInfo(severity, lineNumber, message)
+                                    issues.add(issueInfo)
+                                    LOG.debug("Issue added successfully? List size now: ${issues.size}")
                                 } else {
-                                    LOG.warn("Matched issue pattern in stderr but failed to parse line number from: '$line'")
+                                    LOG.warn("to parse line number (toIntOrNull failed).")
                                 }
                             } catch (parseEx: Exception) {
-                                LOG.warn("Failed to parse details from Graphviz stderr issue line: '$line'", parseEx)
+                                LOG.warn(
+                                    "Exception during parsing matched groups for line: '$trimmedLine'",
+                                    parseEx
+                                )
                             }
+                        } else {
+                            LOG.warn("Regex did NOT match line: '$trimmedLine'") // Sprawdź, jeśli regex nie pasuje
                         }
                     }
                     LOG.debug("Parsed ${issues.size} specific issues from stderr.")
@@ -163,11 +169,10 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
 
         } catch (e: Exception) {
             // catch other unexpected exceptions during the call process itself
-            LOG.error("Unexpected exception during direct 'dot' execution handling for validation.", e)
+            LOG.error("Unexpected exception during direct 'dot' execution handling.", e)
             issues.add(DotIssueInfo(HighlightSeverity.ERROR, 1, "Internal error during validation: ${e.message}"))
         }
-
-        LOG.debug("doAnnotate (direct dot) returning result with ${issues.size} issues.")
+        LOG.debug("doAnnotate returning result with ${issues.size} issues.") // Zmień na WARN/ERROR
         return DotValidationResult(issues)
     }
 
@@ -217,14 +222,15 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
                     val range = TextRange(lineStartOffset, lineEndOffset) // Range covers the whole line.
 
                     // Create annotation using the determined highest severity.
-                    holder.newAnnotation(issue.severity, "Graphviz issue") // Basic description
+                    val shortMessage = issue.message.lines().firstOrNull()?.trim()?.take(120) ?: "Graphviz issue"
+                    holder.newAnnotation(issue.severity, shortMessage)
                         .range(range)
-                        .tooltip(issue.message) // Tooltip shows the message of the highest severity issue.
+                        .tooltip(issue.message)
                         .create()
                     LOG.debug("Created annotation: ${issue.severity} on line ${issue.line}, range $range")
 
                 } catch (e: Exception) {
-                    LOG.error("Failed to apply annotation for issue on line ${issue.line} in ${file.name}", e)
+                    LOG.error("Failed to apply annotation for issue on line ${issue.line}", e)
                 }
             } else {
                 LOG.warn("Invalid line number ${issue.line} reported by Graphviz for file ${file.name}.")
