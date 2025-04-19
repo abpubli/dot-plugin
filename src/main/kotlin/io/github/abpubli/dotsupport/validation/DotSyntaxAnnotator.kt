@@ -4,145 +4,182 @@ import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Document // Required for apply method access
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
+// Imports for Graphviz rendering and exception
 import guru.nidi.graphviz.engine.Format
 import guru.nidi.graphviz.engine.Graphviz
 import guru.nidi.graphviz.engine.GraphvizException
+import java.awt.image.BufferedImage // Import needed for toImage() return type
 import java.util.regex.Pattern
 
 /**
  * An external annotator that uses Graphviz via guru.nidi.graphviz-java
  * to perform syntax validation on DOT files in the background.
- * It parses stderr output from Graphviz upon errors/warnings to create editor annotations.
+ * This version attempts to render a PNG image and relies on catching
+ * GraphvizException to detect and parse errors.
+ * Note: Error detection might be less reliable than direct stderr parsing
+ * if the 'dot' process returns exit code 0 despite syntax errors for PNG output.
  */
 class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>() {
 
-    private companion object {
+    companion object {
         private val LOG = Logger.getInstance(DotSyntaxAnnotator::class.java)
+        init {
+            LOG.info("!!! DotSyntaxAnnotator CLASS LOADED !!!")
+        }
 
         /**
-         * Regex to parse Graphviz error/warning lines.
+         * Regex to parse Graphviz error/warning lines from GraphvizException message.
          * Captures: Group 1=Type ("Error" or "Warning"), Group 2=Line Number, Group 3=Rest of message.
-         * Note: This pattern might need adjustments depending on the specific Graphviz version and output format.
          */
         private val ISSUE_PATTERN: Pattern = Pattern.compile(
             "^(Error|Warning):\\s*(?:.*?:)?\\s*(?:line|near line)\\s*(\\d+)(.*)",
             Pattern.CASE_INSENSITIVE
         )
-        // Limit message parsing length for performance/log readability
-        private const val MAX_STDERR_PARSE_LENGTH = 5000
+        // Limit message parsing length
+        private const val MAX_EXCEPTION_MESSAGE_PARSE_LENGTH = 5000
     }
 
     init {
-        // Ten log pojawi się, gdy IntelliJ utworzy obiekt (instancję) annotatora.
         LOG.info("!!! DotSyntaxAnnotator INSTANCE CREATED !!!")
     }
 
     /**
      * Collects necessary information (file text and document) from the UI thread.
-     * This runs first and requires a read action.
-     * @param file The PSI file being annotated.
-     * @param editor The editor instance.
-     * @param hasErrors Indicates if the file has syntactic errors according to IntelliJ's parser (not used here).
-     * @return DotFileInfo containing text and document, or null if annotation should be skipped.
      */
     override fun collectInformation(file: PsiFile, editor: Editor, hasErrors: Boolean): DotFileInfo? {
         LOG.info("!!! DotSyntaxAnnotator: collectInformation CALLED for ${file.name} !!!")
-        return DotFileInfo(file.text, editor.document)
+        try {
+            val document = editor.document
+            val text = document.text
+            val info = DotFileInfo(text, document)
+            LOG.info("!!! DotSyntaxAnnotator: collectInformation RETURNING info for ${file.name} !!!")
+            return info
+        } catch (e: Throwable) {
+            LOG.error("Error inside collectInformation for ${file.name}", e)
+            return null
+        }
     }
 
     /**
-     * Performs the potentially slow Graphviz validation in a background thread.
-     * It attempts to render the DOT source to a simple format (like DOT itself)
-     * to trigger Graphviz's parser and catches GraphvizException to extract error details.
+     * Performs Graphviz validation by attempting to render a PNG image in a background thread.
+     * Relies solely on catching GraphvizException for error detection.
+     *
      * @param collectedInfo Data gathered by [collectInformation].
-     * @return DotValidationResult containing a list of found issues, or null.
+     * @return DotValidationResult containing issues parsed from GraphvizException, or empty list if no exception.
      */
     override fun doAnnotate(collectedInfo: DotFileInfo?): DotValidationResult? {
         LOG.info("!!! DotSyntaxAnnotator: doAnnotate CALLED (info is null: ${collectedInfo == null}) !!!")
         if (collectedInfo == null) {
-            LOG.debug("No information collected, skipping annotation.")
+            LOG.warn("!!! DotSyntaxAnnotator: doAnnotate returning NULL because collectedInfo is null !!!")
             return null
         }
-        LOG.debug("Starting background annotation for document length ${collectedInfo.text.length}")
+        // Avoid processing potentially huge files
+        if (collectedInfo.text.length > 500_000) {
+            LOG.warn("Skipping annotation for large file (${collectedInfo.text.length} chars)")
+            return DotValidationResult(emptyList())
+        }
+
+        LOG.debug("Starting background annotation (PNG render attempt) for document text length ${collectedInfo!!.text.length}")
 
         val issues = mutableListOf<DotIssueInfo>()
-        try {
-            // Execute Graphviz using a format that primarily involves parsing, like Format.DOT.
-            // We are interested in the exception, not the actual output string here.
-            Graphviz.fromString(collectedInfo.text)
-                .render(Format.DOT)
-                .toString() // Force execution
+        var graphvizExceptionOccurred = false // Simple flag
 
-            LOG.debug("Graphviz execution successful (no critical exception).")
+        try {
+            LOG.debug(">>> DotSyntaxAnnotator: Entering Graphviz try block (attempting PNG render) <<<")
+
+            // Attempt to render to PNG. We primarily care if this throws an exception.
+            // We store the result just to ensure the operation is fully attempted.
+            @Suppress("UNUSED_VARIABLE") // We don't use the image, just check for exceptions
+            val renderedImage: BufferedImage? =
+                Graphviz.fromString(collectedInfo!!.text) // Use non-null assertion
+                    .render(Format.PNG) // Render as PNG, like the preview
+                    .toImage()
+
+            // If control reaches here, the library did not throw GraphvizException.
+            // Assume syntax is OK *as far as this check can tell*.
+            LOG.info(">>> DotSyntaxAnnotator: Graphviz PNG render call finished without throwing GraphvizException.")
 
         } catch (e: GraphvizException) {
-            // Graphviz process likely failed or reported issues via stderr.
-            LOG.warn("GraphvizException caught during annotation: ${e.message?.take(MAX_STDERR_PARSE_LENGTH)}")
-            val errorMessage = e.message ?: ""
-            // Parse the stderr captured in the exception message line by line.
+            // This block executes ONLY if .render(Format.PNG).toImage() throws.
+            graphvizExceptionOccurred = true
+            LOG.warn(">>> DotSyntaxAnnotator: GraphvizException caught during PNG render! Parsing message... <<<")
+            val errorMessage = e.message?.take(MAX_EXCEPTION_MESSAGE_PARSE_LENGTH) ?: ""
+
+            // --- Parse the exception message for error/warning lines ---
             errorMessage.lines().forEach { line ->
                 val matcher = ISSUE_PATTERN.matcher(line.trim())
                 if (matcher.find()) {
                     try {
                         val type = matcher.group(1)
-                        val lineNumber = matcher.group(2)?.toIntOrNull()
-                        val message = line.trim() // Use the full line as the detailed message
+                        val lineNumberStr = matcher.group(2)
+                        val message = line.trim()
+                        val lineNumber = lineNumberStr?.toIntOrNull()
 
                         if (lineNumber != null) {
                             val severity = when (type.lowercase()) {
                                 "error" -> HighlightSeverity.ERROR
                                 "warning" -> HighlightSeverity.WARNING
-                                else -> HighlightSeverity.WEAK_WARNING // Default for unknown types
+                                else -> HighlightSeverity.WEAK_WARNING
                             }
                             issues.add(DotIssueInfo(severity, lineNumber, message))
-                            LOG.debug("Found issue: $type on line $lineNumber")
+                            LOG.debug(">>> DotSyntaxAnnotator: Found and added issue from Exception: $type on line $lineNumber <<<")
+                        } else {
+                            LOG.warn(">>> DotSyntaxAnnotator: Matched issue pattern in Exception but failed to parse line number from: '$line'")
                         }
                     } catch (parseEx: Exception) {
-                        // Log if a line matched the pattern but failed internal parsing (e.g., Int conversion).
-                        LOG.warn("Failed to parse Graphviz issue line content: '$line'", parseEx)
+                        LOG.warn(">>> DotSyntaxAnnotator: Failed to parse details from GraphvizException issue line: '$line'", parseEx)
                     }
-                }
-            }
+                } // End if matcher.find()
+            } // End forEach line
+            LOG.info(">>> DotSyntaxAnnotator: Finished parsing GraphvizException message. Added ${issues.size} issues. <<<")
+            // --- End of parsing logic ---
+
         } catch (e: Exception) {
-            // Catch unexpected errors during the process.
-            LOG.error("Unexpected exception during Graphviz annotation: ${e.message}", e)
-            // Optionally, add a generic error annotation for internal failures.
-            // issues.add(DotIssueInfo(HighlightSeverity.ERROR, 1, "Internal error during validation: ${e.message}"))
+            // Catch other unexpected exceptions during the rendering attempt.
+            LOG.error("!!! DotSyntaxAnnotator: Unexpected exception during Graphviz PNG render call !!!", e)
+            graphvizExceptionOccurred = true // Mark that some failure occurred
         }
 
+        // Log the final result.
+        LOG.info("!!! DotSyntaxAnnotator: doAnnotate RETURNING result with ${issues.size} issues. (GraphvizException occurred: $graphvizExceptionOccurred) !!!")
         return DotValidationResult(issues)
     }
+
 
     /**
      * Applies the validation results (creating annotations) back in the UI thread.
      * Ensures only one annotation (with the highest severity) is shown per line if multiple issues are reported.
+     *
      * @param file The PSI file being annotated.
      * @param annotationResult The validation results from the background task ([doAnnotate]).
      * @param holder The object used to create annotations in the editor.
      */
     override fun apply(file: PsiFile, annotationResult: DotValidationResult?, holder: AnnotationHolder) {
+        // Log entry includes issue count from the result for clarity
+        LOG.info("!!! DotSyntaxAnnotator: apply CALLED for ${file.name} (result is null: ${annotationResult == null}, issue count: ${annotationResult?.issues?.size ?: "N/A"}) !!!")
+
         if (annotationResult == null || annotationResult.issues.isEmpty()) {
-            LOG.debug("No issues found or annotation result is null for ${file.name}.")
+            LOG.debug("No issues found or annotation result is null for ${file.name}. No annotations to apply.")
+            // Optional: Clear previous annotations from this annotator if needed,
+            // though AnnotationHolder often handles this implicitly.
             return
         }
         LOG.debug("Processing ${annotationResult.issues.size} raw issues for ${file.name}.")
 
         val document = file.viewProvider.document
         if (document == null) {
-            // Essential to log this error, as we cannot proceed without the document.
             LOG.error("Could not get document for file ${file.name} in apply phase.")
             return
         }
 
-        // Prioritize issues: If multiple issues exist for the same line,
-        // select only the one with the highest severity (e.g., Error > Warning).
+        // Prioritize issues: Group by line number and select the one with the highest severity for each line.
         val issuesByLineNumber: Map<Int, List<DotIssueInfo>> = annotationResult.issues.groupBy { it.line }
         val highestSeverityIssuesPerLine: List<DotIssueInfo> = issuesByLineNumber.mapNotNull { (_, issuesOnThisLine) ->
-            // HighlightSeverity implements Comparable, allowing maxByOrNull to find the most severe issue.
-            issuesOnThisLine.maxByOrNull { it.severity }
+            issuesOnThisLine.maxByOrNull { it.severity } // Relies on HighlightSeverity being Comparable
         }
 
         LOG.debug("Applying ${highestSeverityIssuesPerLine.size} prioritized annotations for ${file.name}.")
@@ -157,19 +194,17 @@ class DotSyntaxAnnotator : ExternalAnnotator<DotFileInfo, DotValidationResult>()
                     val lineEndOffset = document.getLineEndOffset(line)
                     val range = TextRange(lineStartOffset, lineEndOffset) // Range covers the whole line.
 
-                    // Create annotation using the highest severity found for this line.
-                    holder.newAnnotation(issue.severity, "Graphviz issue")
+                    // Create annotation using the determined highest severity.
+                    holder.newAnnotation(issue.severity, "Graphviz issue") // Basic description
                         .range(range)
                         .tooltip(issue.message) // Tooltip shows the message of the highest severity issue.
                         .create()
                     LOG.debug("Created annotation: ${issue.severity} on line ${issue.line}, range $range")
 
                 } catch (e: Exception) {
-                    // Log exceptions during annotation creation process for a specific issue.
                     LOG.error("Failed to apply annotation for issue on line ${issue.line} in ${file.name}", e)
                 }
             } else {
-                // Log if Graphviz reported an invalid line number relative to the document.
                 LOG.warn("Invalid line number ${issue.line} reported by Graphviz for file ${file.name}.")
             }
         }

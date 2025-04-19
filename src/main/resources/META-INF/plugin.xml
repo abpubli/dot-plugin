@@ -29,6 +29,7 @@
                   language="DOT"
                   extensions="dot"/>
 
+        <lang.parserDefinition language="DOT" implementationClass="io.github.abpubli.dotsupport.parsing.DotParserDefinition"/>
     </extensions>
 
 </idea-plugin>
