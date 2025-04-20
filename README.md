@@ -50,6 +50,46 @@ After installation, open a terminal or command prompt and run:
 dot -V
 ```
 
+## Building the Plugin
+
+Building this plugin requires a local installation of IntelliJ IDEA.
+
+It is recommended to use IntelliJ IDEA version **2024.3.5** or a compatible version from the **2024.3.x** series for building and development. Using incompatible versions might lead to build failures or runtime issues.
+
+### Clean Builds
+
+In some cases, especially if you encounter inconsistent build results or suspect caching issues, you might need to perform a clean build. This process bypasses the Gradle build and configuration caches, ensuring that the plugin is built entirely from scratch. Note that clean builds are typically slower than cached builds.
+
+To perform a clean build, open your terminal in the project's root directory and run the following command:
+
+```bash
+./gradlew clean buildPlugin --no-build-cache --no-configuration-cache
+```
+
+This command will first clean the previous build outputs and then execute the `buildPlugin` task without using any Gradle caches.
+
+## Known Build Issue (`buildSearchableOptions`)
+
+During the plugin build process, specifically in the `buildSearchableOptions` task, `SEVERE` errors (e.g., `Memory leak detected... registered ... as child of 'ROOT_DISPOSABLE'`) might appear in the logs. This has been observed when building against certain IntelliJ Platform versions (e.g., stable 2024.3.5 and EAP 2025.1) and seems related to issues within the platform itself or its bundled components when initializing settings pages for indexing. Importantly, these errors often do not halt the entire build process, and the final plugin `.zip` file is still created correctly.
+
+### Applied Workaround
+
+To eliminate these potentially misleading errors from the build logs and ensure a more predictable build process, the `buildSearchableOptions` task has been intentionally **disabled** in the Gradle configuration (`build.gradle.kts`).
+
+Since this plugin **currently does not add any custom settings pages** to the IntelliJ Settings/Preferences dialog, the `buildSearchableOptions` task (which indexes these settings for the search functionality) is not essential for the plugin's operation. Disabling it does not negatively impact the plugin's functionality for the end-user.
+
+The configuration disabling the task in `build.gradle.kts` (for the `org.jetbrains.intellij` v1.x plugin) looks like this:
+
+```kotlin
+// Inside the tasks { ... } block or at the top level
+tasks.named<org.jetbrains.intellij.tasks.BuildSearchableOptionsTask>("buildSearchableOptions") {
+    enabled = false // Disabled due to non-fatal SEVERE errors (platform issue) logged by this task during build.
+}
+```
+
+If custom configurable settings are added to the plugin in the future, this task may need to be re-enabled (by setting `enabled = true`). This might require addressing the underlying platform issues or targeting a newer, fixed version of the IntelliJ Platform.
+
+
 ## Usage
 
 1.  Open a `.dot` file in IntelliJ IDEA.

@@ -1,50 +1,43 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile // Import może być potrzebny dla withType
 
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
-    id("org.jetbrains.intellij.platform") version "2.3.0"
+    id("org.jetbrains.intellij") version "1.17.4"
 }
 
 group = "io.github.abpubli"
-version = "1.3.1"
+version = "1.3.2"
 
 repositories {
     mavenCentral()
-    intellijPlatform {
-        defaultRepositories()
-    }
 }
 
-// Configure Gradle IntelliJ Plugin
-// Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
-dependencies {
-    intellijPlatform {
-        create("IC", "2025.1")
-        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
-    }
+intellij { // Target IDE Platform
+    version.set("2024.3.5")
+    type.set("IC")
+    plugins.set(listOf()) // No plugin dependencies declared
 }
 
-intellijPlatform {
-    pluginConfiguration {
-        ideaVersion {
-            sinceBuild = "251"
-            untilBuild = "251.*"
-        }
-
-        changeNotes = """
-      Initial version
-    """.trimIndent()
-    }
+tasks.named<org.jetbrains.intellij.tasks.BuildSearchableOptionsTask>("buildSearchableOptions") {
+    enabled = false // Disabled due to non-fatal SEVERE errors (platform issue) logged by this task during build.
 }
+
 
 tasks {
-    // Set the JVM compatibility versions
     withType<JavaCompile> {
-        sourceCompatibility = "21"
-        targetCompatibility = "21"
+        sourceCompatibility = "17"
+        targetCompatibility = "17"
     }
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-        compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
+    withType<KotlinCompile> {
+        kotlinOptions.jvmTarget = "17"
+    }
+
+    patchPluginXml {
+        sinceBuild.set("243")
+        untilBuild.set("251.*")
+        changeNotes.set("""
+      Initial version
+    """.trimIndent())
     }
 }
