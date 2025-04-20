@@ -6,7 +6,8 @@ IntelliJ Platform plugin providing enhanced support for the Graphviz DOT languag
 
 * Live preview panel to visualize graphs as you type.
 * Split editor view (Editor / Split / Preview modes).
-
+* Error highlighting: underlines the line in the `.dot` file editor where a syntax error is detected, helping you quickly find and fix issues.
+* New file template: option available under `File -> New` to create a new `.dot` file with sample content, getting you started faster.
 ## Prerequisites
 
 This plugin requires a working **Graphviz** installation on your system to render graphs. Please install it using the appropriate method for your operating system:

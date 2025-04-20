@@ -12,6 +12,8 @@
       <li>Custom editor with integrated live preview panel.</li>
       <li>Multiple view modes: Code Only, Split (Code and Preview), Preview Only.</li>
       <li>Renders graphs using the native Graphviz engine (Graphviz installation may be required - see documentation).</li>
+      <li>Error highlighting directly in the editor to quickly locate issues.</li>
+      <li>New file template (<code>File -> New</code>) with sample content for a quick start.</li>
     </ul>
     Aims to provide a seamless workflow for viewing and editing DOT graph descriptions.
     ]]></description>
