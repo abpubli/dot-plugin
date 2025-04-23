@@ -52,9 +52,7 @@ dot -V
 
 ## Building the Plugin
 
-Building this plugin requires a local installation of IntelliJ IDEA.
-
-It is recommended to use IntelliJ IDEA version **2024.3.5** or a compatible version from the **2024.3.x** series for building and development. Using incompatible versions might lead to build failures or runtime issues.
+For local development and debugging, use local insalled IDEA.
 
 ### Clean Builds
 
