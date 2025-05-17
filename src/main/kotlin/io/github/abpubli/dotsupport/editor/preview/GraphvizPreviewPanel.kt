@@ -74,12 +74,22 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         showStatus("Waiting for data...")
     }
 
+    @Volatile
+    private var renderingInProgress = false
+
     fun triggerUpdate(dotText: String, force: Boolean = false) {
         LOG.trace("triggerUpdate called. Force: $force, New text length: ${dotText.length}, Last text length: ${lastRenderedText?.length}")
         if (!force && dotText == lastRenderedText) {
             LOG.trace("Skipping render: Text unchanged and force=false.")
             return
         }
+
+        if (renderingInProgress) {
+            LOG.debug("Skipping triggerUpdate: previous rendering still in progress.")
+            return
+        }
+        renderingInProgress = true
+
         LOG.trace("Proceeding with preview update.")
         LOG.debug("Setting status to 'Rendering...'")
         showStatus("Rendering...") // Update status area
@@ -190,6 +200,8 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
                     // Show execution error (e.g., dot not found, timeout)
                     showError("Failed to run/process Graphviz 'dot': ${finalError.message}")
                 }
+            } finally {
+                renderingInProgress = false
             }
         }
     }
