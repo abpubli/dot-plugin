@@ -1,7 +1,5 @@
 .kotlin
-.idea
 .intellijPlatform
-gradle
 .gradle
 **/build/
 !src/**/build/
