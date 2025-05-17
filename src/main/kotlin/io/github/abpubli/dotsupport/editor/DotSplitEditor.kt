@@ -1,5 +1,6 @@
 package io.github.abpubli.dotsupport.editor
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -27,10 +28,11 @@ private class DotEditorHeader(panel: JComponent) : EditorHeaderComponent() {
 class DotSplitEditor(
     private val textEditor: TextEditor,
     private val previewComponent: JComponent
-) : FileEditor {
+) : FileEditor, Disposable {
 
     private val splitter = JBSplitter(false, 0.5f)
     private val mainPanel = JPanel(BorderLayout())
+    private var disposed = false
 
     init {
         splitter.firstComponent = textEditor.component
@@ -54,6 +56,7 @@ class DotSplitEditor(
 
             document.addDocumentListener(object : com.intellij.openapi.editor.event.DocumentListener {
                 override fun documentChanged(event: com.intellij.openapi.editor.event.DocumentEvent) {
+                    if (!previewComponent.isDisplayable || isDisposed()) return
                     previewComponent.triggerUpdate(document.text)
                 }
             }, this)
@@ -80,8 +83,12 @@ class DotSplitEditor(
     }
 
     override fun dispose() {
+        disposed = true
         Disposer.dispose(textEditor)
     }
+
+    fun isDisposed(): Boolean = disposed
+
     override fun isModified(): Boolean = textEditor.isModified
     override fun isValid(): Boolean = textEditor.isValid
     private val listeners = mutableListOf<PropertyChangeListener>()
