@@ -1,0 +1,83 @@
+# Workflow name in GitHub Actions UI
+name: Build IntelliJ Plugin
+
+on:
+  push:
+    branches: [ main ] # Adjust branch name if needed
+    # Only trigger the build on push if relevant files were changed
+    paths:
+      - 'src/**'                 # Source code changes
+      - 'build.gradle.kts'       # Main build script changes
+      - 'settings.gradle.kts'    # Gradle settings changes
+      - 'gradle.properties'      # Gradle properties changes
+      - 'gradlew'                # Wrapper script changes
+      - 'gradlew.bat'            # Wrapper script changes (Windows)
+      - 'gradle/wrapper/**'      # Wrapper JAR or properties changes
+      - '.github/workflows/**'   # Changes to the workflow file itself
+
+  pull_request:
+    branches: [ main ] # Adjust branch name if needed
+    # Optionally, apply the same path filters to pull requests for consistency
+    paths:
+      - 'src/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'gradle/wrapper/**'
+      - '.github/workflows/**'
+
+  # Allows manually running the workflow from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Use the latest stable Ubuntu runner
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin' # Adoptium Temurin distribution
+
+      # Cache Gradle dependencies and downloaded IDEs to speed up subsequent builds.
+      # Cache key is based on OS and hashes of Gradle configuration files.
+      - name: Cache Gradle packages and IntelliJ SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.gradle/jdks
+            ~/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.idea
+            ~/.gradle/caches/modules-2/files-2.1/com.jetbrains.intellij.platform
+          key: ${{ runner.os }}-gradle-intellij-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-intellij-
+
+      # The gradlew script needs execute permission on Linux/macOS runners
+      - name: Grant execute permission for gradlew
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+
+      # Build the plugin using the dedicated task from gradle-intellij-plugin.
+      # This task handles downloading the IntelliJ Platform SDK specified in build.gradle.kts.
+      # --no-daemon is recommended for CI, --info provides more detailed logs.
+      - name: Build IntelliJ Plugin with Gradle
+        run: ./gradlew buildPlugin --no-daemon --info
+
+      # Upload the generated plugin ZIP file as a build artifact.
+      # This allows downloading the result from the workflow summary page.
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Name of the artifact as it will appear in GitHub UI
+          name: dot-support-plugin
+          # Path to the built plugin file(s). '*' handles potential version numbers in the filename.
+          path: build/distributions/*.zip
