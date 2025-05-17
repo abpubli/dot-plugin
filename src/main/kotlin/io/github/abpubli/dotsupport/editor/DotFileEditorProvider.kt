@@ -3,9 +3,12 @@ package io.github.abpubli.dotsupport.editor
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.FileEditorProvider
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import io.github.abpubli.dotsupport.editor.preview.GraphvizPreviewPanel
 import io.github.abpubli.dotsupport.filetype.DotFileType
 
 /**
@@ -31,8 +34,12 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
      * Returns an instance of DotEditorWithPreview.
      */
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
-        return DotEditorWithPreview(project, file)
+        val textEditor = TextEditorProvider.getInstance().createEditor(project, file) as TextEditor
+        val previewPanel = GraphvizPreviewPanel()
+
+        return DotSplitEditor(textEditor, previewPanel)
     }
+
 
     /**
      * Returns the unique identifier for this editor type.
