@@ -42,12 +42,17 @@ class DotSplitEditor(
     private val previewComponent: JComponent
 ) : FileEditor, Disposable {
 
-    private val splitter = JBSplitter(false, 0.5f)
+    private val splitter = JBSplitter(
+        com.intellij.ide.util.PropertiesComponent.getInstance().getBoolean("dot.orientation", false),
+        0.5f
+    )
     private val mainPanel = JPanel(BorderLayout())
     private var disposed = false
 
     private enum class ViewMode { EDITOR_ONLY, PREVIEW_ONLY, SPLIT }
-    private var viewMode = ViewMode.EDITOR_ONLY
+    private var viewMode = ViewMode.valueOf(
+        com.intellij.ide.util.PropertiesComponent.getInstance().getValue("dot.viewMode", ViewMode.SPLIT.name)
+    )
 
     init {
         splitter.firstComponent = textEditor.component
@@ -120,6 +125,8 @@ class DotSplitEditor(
     }
 
     private fun applyViewMode() {
+        com.intellij.ide.util.PropertiesComponent.getInstance().setValue("dot.viewMode", viewMode.name)
+        com.intellij.ide.util.PropertiesComponent.getInstance().setValue("dot.orientation", splitter.orientation)
         when (viewMode) {
             ViewMode.EDITOR_ONLY -> {
                 splitter.firstComponent = textEditor.component
@@ -172,4 +179,14 @@ class DotSplitEditor(
     }
 
     override fun getFile(): VirtualFile = textEditor.file
+}
+
+private class ToggleSplitOrientationAction (
+    private val splitter: JBSplitter
+) : DumbAwareAction("Toggle Orientation", "Switch preview/editor layout", AllIcons.Actions.SplitHorizontally) {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        splitter.orientation = !splitter.orientation
+        com.intellij.ide.util.PropertiesComponent.getInstance().setValue("dot.orientation", splitter.orientation)
+    }
 }
