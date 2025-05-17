@@ -17,6 +17,7 @@ import io.github.abpubli.dotsupport.editor.preview.GraphvizPreviewFileEditor
 import io.github.abpubli.dotsupport.editor.preview.GraphvizPreviewPanel
 import javax.swing.SwingUtilities
 import javax.swing.Timer
+import com.intellij.openapi.Disposable
 
 /**
  * The main editor for DOT files, combining a standard IntelliJ [TextEditor]
@@ -37,7 +38,14 @@ class DotEditorWithPreview(
     "DOT Editor",                              // Display name for the editor tab
     Layout.SHOW_EDITOR_AND_PREVIEW,            // Default layout arrangement: show both editor and preview
     true                                       // Give focus to the text editor on open
-) {
+), Disposable {
+    private var disposed = false
+
+    override fun dispose() {
+        disposed = true
+    }
+
+    fun isDisposed(): Boolean = disposed
 
     // Companion object holds the factory methods and the logger instance
     private companion object {
@@ -130,7 +138,7 @@ class DotEditorWithPreview(
         val initialUpdateDelay = 300 // Delay in milliseconds before the first render attempt
         val initialUpdateTimer = Timer(initialUpdateDelay) {
             // Check if the editor hasn't been disposed before the timer's action executes.
-            if (!Disposer.isDisposed(this@DotEditorWithPreview)) {
+            if (!isDisposed()) {
                 LOG.debug("Initial preview update timer fired. Triggering update (force=true).")
                 triggerPreviewUpdate(force = true) // Force the first render attempt.
             } else {
@@ -155,7 +163,7 @@ class DotEditorWithPreview(
         // Add a new request to trigger the update after a specified delay.
         updateAlarm.addRequest({
             // Double-check the disposal state before actually running the update task.
-            if (!Disposer.isDisposed(this@DotEditorWithPreview)) {
+            if (!isDisposed()) {
                 LOG.debug("Debounced update request executing.")
                 triggerPreviewUpdate(force = false) // Trigger the update, no forcing needed for subsequent updates.
             } else {
@@ -175,7 +183,7 @@ class DotEditorWithPreview(
      */
     private fun triggerPreviewUpdate(force: Boolean = false) {
         // Immediately exit if the editor is already disposed.
-        if (Disposer.isDisposed(this)) {
+        if (isDisposed()) {
             LOG.debug("Attempted to trigger preview update, but editor is disposed.")
             return
         }
@@ -188,7 +196,7 @@ class DotEditorWithPreview(
         // Reading document content MUST happen under a read action.
         ApplicationManager.getApplication().runReadAction {
             // Re-check disposal state inside the read action, as disposal might happen concurrently.
-            if (Disposer.isDisposed(this@DotEditorWithPreview)) {
+            if (isDisposed()) {
                 LOG.debug("ReadAction started, but editor was disposed before document access.")
                 return@runReadAction // Exit the lambda.
             }
@@ -231,7 +239,7 @@ class DotEditorWithPreview(
                 }
             }
             // Provide additional debugging information if the panel is null but the editor wrapper exists.
-            if (previewPanel == null && previewEditor != null) {
+            if (previewPanel == null) {
                 LOG.warn("    (Preview panel is null, but previewEditor exists. Secondary editor type is: ${previewEditor.javaClass.name}. Expected GraphvizPreviewFileEditor containing GraphvizPreviewPanel)")
             }
         }
