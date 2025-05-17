@@ -30,7 +30,9 @@ tasks {
         targetCompatibility = "17"
     }
     withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "17"
+        compilerOptions {
+            freeCompilerArgs.addAll(listOf("-Xjsr305=strict", "-Xcontext-receivers"))
+        }
     }
 
     patchPluginXml {
