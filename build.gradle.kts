@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.3.3"
+version = "1.4.0"
 
 repositories {
     mavenCentral()
@@ -39,7 +39,12 @@ tasks {
         sinceBuild.set("243")
         untilBuild.set("252.*")
         changeNotes.set("""
-      Removed usage of deprecated Disposer.isDisposed and Thread.getId()
-    """.trimIndent())
+  <ul>
+    <li>Prevents unwanted horizontal split</li>
+    <li>Custom split handling with buttons</li>
+    <li>Added fourth buton: toggle between horizontal and vertical split</li>
+    <li>Preserved error highlighting</li>
+  </ul>
+""".trimIndent())
     }
 }
