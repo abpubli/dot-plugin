@@ -37,7 +37,7 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set("243")
-        untilBuild.set("251.*")
+        untilBuild.set("252.*")
         changeNotes.set("""
       Removed usage of deprecated Disposer.isDisposed and Thread.getId()
     """.trimIndent())
