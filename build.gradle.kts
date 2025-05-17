@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.4.0"
+version = "1.4.2"
 
 repositories {
     mavenCentral()
@@ -44,6 +44,7 @@ tasks {
     <li>Custom split handling with buttons</li>
     <li>Added fourth buton: toggle between horizontal and vertical split</li>
     <li>Preserved error highlighting</li>
+    <li>Remember view mode and split orientation</li>
   </ul>
 """.trimIndent())
     }
