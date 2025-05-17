@@ -1,5 +1,6 @@
 package io.github.abpubli.dotsupport.editor
 
+import com.intellij.codeHighlighting.BackgroundEditorHighlighter
 import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.openapi.Disposable
@@ -77,6 +78,14 @@ class DotSplitEditor(
             previewComponent.triggerUpdate(document.text, force = true)
         }
         applyViewMode() // initial
+    }
+
+    override fun getBackgroundHighlighter(): BackgroundEditorHighlighter? {
+        return textEditor.backgroundHighlighter
+    }
+
+    override fun getCurrentLocation(): com.intellij.openapi.fileEditor.FileEditorLocation? {
+        return textEditor.currentLocation
     }
 
     private fun createToolbar(): ActionToolbar {
