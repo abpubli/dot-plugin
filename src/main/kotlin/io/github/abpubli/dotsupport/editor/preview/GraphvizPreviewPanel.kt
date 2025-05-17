@@ -34,6 +34,8 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         private const val MAX_CONCISE_MESSAGE_LENGTH = 150
     }
 
+    private var disposed = false
+
     @Volatile
     private var lastRenderingTask: Future<*>? = null
     private val imageLabel: JLabel = JLabel()
@@ -77,6 +79,9 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
     @Volatile
     private var renderingInProgress = false
 
+    @Volatile
+    private var pendingText: String? = null
+
     fun triggerUpdate(dotText: String, force: Boolean = false) {
         LOG.trace("triggerUpdate called. Force: $force, New text length: ${dotText.length}, Last text length: ${lastRenderedText?.length}")
         if (!force && dotText == lastRenderedText) {
@@ -85,10 +90,12 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         }
 
         if (renderingInProgress) {
+            pendingText = dotText
             LOG.debug("Skipping triggerUpdate: previous rendering still in progress.")
             return
         }
         renderingInProgress = true
+        pendingText = null
 
         LOG.trace("Proceeding with preview update.")
         LOG.debug("Setting status to 'Rendering...'")
@@ -202,9 +209,20 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
                 }
             } finally {
                 renderingInProgress = false
+                pendingText?.let {
+                    pendingText = null
+                    LOG.debug("Running pending queued update after rendering completion.")
+                    ApplicationManager.getApplication().invokeLater {
+                        if (isDisplayable && !isDisposed()) {
+                            triggerUpdate(it)
+                        }
+                    }
+                }
             }
         }
     }
+
+    fun isDisposed(): Boolean = disposed
 
     override fun dispose() {
         LOG.debug("Disposing GraphvizPreviewPanel")
@@ -212,6 +230,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         lastRenderingTask = null
         imageLabel.icon = null
         lastRenderedText = null
+        disposed = true
     }
 
     private fun updateImage(image: BufferedImage) {
