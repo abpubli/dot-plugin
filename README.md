@@ -1,4 +1,4 @@
-# IntelliJ DOT Language Support Plugin (intellij-dot-plugin)
+# DOT Language Support Plugin (dot-plugin)
 
 IntelliJ Platform plugin providing enhanced support for the Graphviz DOT language.
 
