@@ -89,19 +89,19 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         errorToDisplay = null
 
         lastRenderingTask = ApplicationManager.getApplication().executeOnPooledThread {
-            LOG.debug("Background thread [${Thread.currentThread().id}]: Starting direct 'dot -Tpng' execution.")
+            LOG.debug("Background thread [${Thread.currentThread().name}]: Starting direct 'dot -Tpng' execution.")
 
             var executionResult: DotExecutionResult? = null
             try {
                 if (Thread.currentThread().isInterrupted) {
-                    LOG.debug("Background thread [${Thread.currentThread().id}]: Task cancelled before 'dot' execution.")
+                    LOG.debug("Background thread [${Thread.currentThread().name}]: Task cancelled before 'dot' execution.")
                     return@executeOnPooledThread
                 }
 
                 executionResult = runDotCommand(dotText, "png", 15)
 
                 if (Thread.currentThread().isInterrupted) {
-                    LOG.debug("Background thread [${Thread.currentThread().id}]: Task cancelled after 'dot' execution.")
+                    LOG.debug("Background thread [${Thread.currentThread().name}]: Task cancelled after 'dot' execution.")
                     return@executeOnPooledThread
                 }
 
@@ -174,7 +174,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
             } catch (e: Exception) {
                 if (e is InterruptedException || Thread.currentThread().isInterrupted) {
                     LOG.debug(
-                        "Background thread [${Thread.currentThread().id}]: Direct 'dot' execution cancelled/interrupted in outer catch.",
+                        "Background thread [${Thread.currentThread().name}]: Direct 'dot' execution cancelled/interrupted in outer catch.",
                         e
                     )
                     return@executeOnPooledThread
