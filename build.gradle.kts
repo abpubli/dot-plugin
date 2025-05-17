@@ -39,7 +39,7 @@ tasks {
         sinceBuild.set("243")
         untilBuild.set("251.*")
         changeNotes.set("""
-      Initial version
+      Removed usage of deprecated Disposer.isDisposed and Thread.getId()
     """.trimIndent())
     }
 }
