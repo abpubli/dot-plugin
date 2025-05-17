@@ -22,6 +22,7 @@ import com.intellij.openapi.util.NlsContexts
 import com.intellij.ui.JBSplitter
 import io.github.abpubli.dotsupport.editor.preview.GraphvizPreviewPanel
 import java.awt.BorderLayout
+import java.awt.Component
 import java.awt.Dimension
 import java.beans.PropertyChangeListener
 import java.util.concurrent.Future
@@ -46,7 +47,7 @@ class DotSplitEditor(
     private var disposed = false
 
     private enum class ViewMode { EDITOR_ONLY, PREVIEW_ONLY, SPLIT }
-    private var viewMode = ViewMode.SPLIT
+    private var viewMode = ViewMode.EDITOR_ONLY
 
     init {
         splitter.firstComponent = textEditor.component
@@ -54,7 +55,7 @@ class DotSplitEditor(
 
         val toolbar = createToolbar()
         val headerPanel = JPanel(BorderLayout())
-        headerPanel.add(toolbar.component, BorderLayout.CENTER)
+        headerPanel.add(toolbar.component, BorderLayout.EAST)
 
         val wrappedHeader = DotEditorHeader(headerPanel)
 
@@ -89,11 +90,7 @@ class DotSplitEditor(
     }
 
     private fun createToolbar(): ActionToolbar {
-        val leftGroup = DefaultActionGroup().apply {
-            add(ToggleSplitOrientationAction(splitter))
-        }
-
-        val rightGroup = DefaultActionGroup().apply {
+        val group = DefaultActionGroup().apply {
             add(object : DumbAwareAction("Editor Only", "Show only DOT editor", AllIcons.Actions.Edit) {
                 override fun actionPerformed(e: AnActionEvent) {
                     viewMode = ViewMode.EDITOR_ONLY
@@ -112,44 +109,14 @@ class DotSplitEditor(
                     applyViewMode()
                 }
             })
+            addSeparator()
+            add(ToggleSplitOrientationAction(splitter))
         }
-        val toolbarPanel = JPanel(BorderLayout())
-        val leftToolbar = ActionManager.getInstance().createActionToolbar("DOT.LeftToolbar", leftGroup, true)
-        val rightToolbar = ActionManager.getInstance().createActionToolbar("DOT.RightToolbar", rightGroup, true)
 
-        leftToolbar.targetComponent = mainPanel
-        rightToolbar.targetComponent = mainPanel
-
-        toolbarPanel.add(leftToolbar.component, BorderLayout.WEST)
-        toolbarPanel.add(rightToolbar.component, BorderLayout.EAST)
-
-        return object : ActionToolbar {
-            override fun getComponent(): JComponent = toolbarPanel
-            override fun updateActionsImmediately() {}
-            override fun getActions(): MutableList<AnAction> = mutableListOf()
-            override fun setTargetComponent(component: JComponent?) {}
-            override fun getPlace(): String = "DOT.CompositeToolbar"
-            override fun getLayoutStrategy(): ToolbarLayoutStrategy = ToolbarLayoutStrategy.NOWRAP_STRATEGY
-            override fun setLayoutStrategy(strategy: ToolbarLayoutStrategy) {}
-            override fun setMinimumButtonSize(size: Dimension) {}
-            override fun getMinimumButtonSize(): Dimension = Dimension(0, 0)
-            override fun setOrientation(orientation: Int) {}
-            override fun getOrientation(): Int = 0
-            override fun getMaxButtonHeight(): Int = 0
-            override fun updateActionsAsync(): java.util.concurrent.Future<*> = java.util.concurrent.CompletableFuture.completedFuture(null)
-            override fun hasVisibleActions(): Boolean = true
-            override fun getTargetComponent(): JComponent? = mainPanel
-            override fun setMiniMode(minimalMode: Boolean) {}
-            override fun getToolbarDataContext(): DataContext = DataManager.getInstance().getDataContext(mainPanel)
-            override fun setReservePlaceAutoPopupIcon(reserve: Boolean) {}
-            override fun isReservePlaceAutoPopupIcon(): Boolean = false
-            override fun setSecondaryActionsTooltip(secondaryActionsTooltip: String) {}
-            override fun setSecondaryActionsShortcut(secondaryActionsShortcut: String) {}
-            override fun setSecondaryActionsIcon(icon: Icon?) {}
-            override fun setSecondaryActionsIcon(icon: Icon?, hideDropdownIcon: Boolean) {}
-            override fun setLayoutSecondaryActions(`val`: Boolean) {}
-            override fun getActionGroup(): ActionGroup = DefaultActionGroup()
-        }
+        val toolbar = ActionManager.getInstance().createActionToolbar("DOT.Toolbar", group, true)
+        toolbar.targetComponent = mainPanel
+        toolbar.component.alignmentX = Component.RIGHT_ALIGNMENT
+        return toolbar
     }
 
     private fun applyViewMode() {
