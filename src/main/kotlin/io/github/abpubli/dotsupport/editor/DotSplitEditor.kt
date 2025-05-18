@@ -2,31 +2,24 @@ package io.github.abpubli.dotsupport.editor
 
 import com.intellij.codeHighlighting.BackgroundEditorHighlighter
 import com.intellij.icons.AllIcons
-import com.intellij.ide.DataManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.editor.impl.EditorHeaderComponent
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy
-import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.util.NlsContexts
 import com.intellij.ui.JBSplitter
 import io.github.abpubli.dotsupport.editor.preview.GraphvizPreviewPanel
 import java.awt.BorderLayout
 import java.awt.Component
-import java.awt.Dimension
 import java.beans.PropertyChangeListener
-import java.util.concurrent.Future
-import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
 

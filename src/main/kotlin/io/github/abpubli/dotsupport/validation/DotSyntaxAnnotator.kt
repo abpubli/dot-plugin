@@ -10,7 +10,6 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiFile
 import io.github.abpubli.dotsupport.external.GRAPHVIZ_ISSUE_PATTERN
 import io.github.abpubli.dotsupport.external.runDotCommand
-import java.util.regex.Pattern
 
 /**
  * An external annotator that uses Graphviz via guru.nidi.graphviz-java

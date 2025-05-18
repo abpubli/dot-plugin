@@ -1,5 +1,6 @@
 package io.github.abpubli.dotsupport.parsing
 
+import com.intellij.extapi.psi.ASTWrapperPsiElement
 import com.intellij.lang.ASTNode
 import com.intellij.lang.ParserDefinition
 import com.intellij.lang.PsiParser
@@ -11,8 +12,6 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.tree.IFileElementType
 import com.intellij.psi.tree.TokenSet
 import io.github.abpubli.dotsupport.filetype.DotLanguage
-import com.intellij.extapi.psi.ASTWrapperPsiElement
-import com.intellij.lang.PsiBuilder // Potrzebny import
 
 class DotParserDefinition : ParserDefinition {
 
