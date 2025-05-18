@@ -30,7 +30,7 @@
                   implementationClass="io.github.abpubli.dotsupport.filetype.DotFileType"
                   fieldName="INSTANCE"
                   language="AbpubliDot"
-                  extensions="dot"/>
+                  extensions="dot;gv"/>
 
         <lang.parserDefinition language="AbpubliDot" implementationClass="io.github.abpubli.dotsupport.parsing.DotParserDefinition"/>
     </extensions>
