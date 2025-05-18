@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.4.2"
+version = "1.4.5"
 
 repositories {
     mavenCentral()
@@ -40,11 +40,8 @@ tasks {
         untilBuild.set("252.*")
         changeNotes.set("""
   <ul>
-    <li>Prevents unwanted horizontal split</li>
-    <li>Custom split handling with buttons</li>
-    <li>Added fourth buton: toggle between horizontal and vertical split</li>
-    <li>Preserved error highlighting</li>
-    <li>Remember view mode and split orientation</li>
+    <li>Added support for .gv files (same features as .dot)</li>
+    <li>Updated internal language and action names to prevent naming conflicts with other plugins</li>
   </ul>
 """.trimIndent())
     }
