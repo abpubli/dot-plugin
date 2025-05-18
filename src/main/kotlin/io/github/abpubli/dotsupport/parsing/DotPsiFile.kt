@@ -1,6 +1,4 @@
-// Utwórz plik np. DotPsiFile.kt w pakiecie io.github.abpubli.dotsupport.parsing
-
-package io.github.abpubli.dotsupport.parsing // Upewnij się, że pakiet jest poprawny
+package io.github.abpubli.dotsupport.parsing
 
 import com.intellij.extapi.psi.PsiFileBase          // Potrzebny import
 import com.intellij.openapi.fileTypes.FileType
@@ -10,20 +8,20 @@ import io.github.abpubli.dotsupport.filetype.DotFileType  // Import Twojego File
 import io.github.abpubli.dotsupport.filetype.DotLanguage  // Import Twojego Language
 
 /**
- * Minimalna implementacja PsiFile dla plików języka DOT.
- * Dziedziczy z PsiFileBase, co jest standardową praktyką.
+ * Minimal implementation of PsiFile for DOT language files.
+ * Inherits from PsiFileBase, which is a standard practice.
  */
 class DotPsiFile(viewProvider: FileViewProvider) : PsiFileBase(viewProvider, DotLanguage) {
 
-    // Zwraca obiekt FileType powiązany z tym plikiem PSI.
-    override fun getFileType(): FileType = DotFileType // Odwołanie do obiektu DotFileType
+    // Returns the FileType object associated with this PSI file.
+    override fun getFileType(): FileType = DotFileType // Reference to the DotFileType object
 
-    // Zwraca nazwę typu pliku (używane np. w UI).
-    override fun toString(): String = "DOT File"
+    // Returns the name of the file type (used e.g. in the UI).
+    override fun toString(): String = "Dot File"
 
     /**
-     * Metoda wymagana przez wzorzec Visitor, używana przez różne narzędzia analizy IntelliJ.
-     * Standardowa implementacja dla pliku woła visitor.visitFile(this).
+     * Method required by the Visitor pattern, used by various IntelliJ analysis tools.
+     * The standard file implementation calls visitor.visitFile(this).
      */
     override fun accept(visitor: PsiElementVisitor) {
         visitor.visitFile(this)

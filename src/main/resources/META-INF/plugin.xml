@@ -11,6 +11,7 @@
     <ul>
       <li>Custom editor with integrated live preview panel.</li>
       <li>Multiple view modes: Code Only, Split (Code and Preview), Preview Only.</li>
+      <li>Toggling between vertical and horizontal split.</li>
       <li>Renders graphs using the native Graphviz engine (Graphviz installation may be required - see documentation).</li>
       <li>Error highlighting directly in the editor to quickly locate issues.</li>
       <li>New file template (<code>File -> New</code>) with sample content for a quick start.</li>
@@ -21,26 +22,26 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <externalAnnotator language="DOT" implementationClass="io.github.abpubli.dotsupport.validation.DotSyntaxAnnotator"/>
+        <externalAnnotator language="AbpubliDot" implementationClass="io.github.abpubli.dotsupport.validation.DotSyntaxAnnotator"/>
 
         <fileEditorProvider implementation="io.github.abpubli.dotsupport.editor.DotFileEditorProvider"/>
 
-        <fileType name="DOT file"
+        <fileType name="Dot file"
                   implementationClass="io.github.abpubli.dotsupport.filetype.DotFileType"
                   fieldName="INSTANCE"
-                  language="DOT"
+                  language="AbpubliDot"
                   extensions="dot"/>
 
-        <lang.parserDefinition language="DOT" implementationClass="io.github.abpubli.dotsupport.parsing.DotParserDefinition"/>
+        <lang.parserDefinition language="AbpubliDot" implementationClass="io.github.abpubli.dotsupport.parsing.DotParserDefinition"/>
     </extensions>
 
     <actions>
-        <action id="myplugin.NewDotFileAction"
+        <action id="abpubli.dotsupport.NewDotFileAction"
                 class="io.github.abpubli.dotsupport.actions.NewDotFileAction"
-                text="DOT File"
+                text="Dot File"
                 description="Creates a new Graphviz DOT file"
                 icon="/icons/dotFile.svg">
-            <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFile"/>
+            <add-to-group group-id="NewGroup" anchor="after" relative-to-action="NewFile"/>
         </action>
     </actions>
 

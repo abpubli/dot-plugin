@@ -18,7 +18,7 @@ import io.github.abpubli.dotsupport.icons.DotSupportIcons
 
 // Use DumbAwareAction if the action should work during indexing
 class NewDotFileAction : DumbAwareAction(
-    "DOT File", // Text in the "New" menu
+    "Dot File", // Text in the "New" menu
     "Creates a new Graphviz DOT file", // Description
     DotSupportIcons.DOT_ACTION_ICON // Optional icon (define your own)
 ) {
