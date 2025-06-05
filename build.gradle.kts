@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.4.5"
+version = "1.4.6"
 
 repositories {
     mavenCentral()
@@ -36,12 +36,12 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("243")
+        sinceBuild.set("231")
         untilBuild.set("252.*")
         changeNotes.set("""
   <ul>
-    <li>Added support for .gv files (same features as .dot)</li>
-    <li>Updated internal language and action names to prevent naming conflicts with other plugins</li>
+    <li>Extended compatibility with older IDE versions</li>
+    <li>Testes since 2023.1 until 2025.2</li>  
   </ul>
 """.trimIndent())
     }
