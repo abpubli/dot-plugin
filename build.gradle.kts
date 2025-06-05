@@ -36,12 +36,12 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("231")
+        sinceBuild.set("232")
         untilBuild.set("252.*")
         changeNotes.set("""
   <ul>
     <li>Extended compatibility with older IDE versions</li>
-    <li>Testes since 2023.1 until 2025.2</li>  
+    <li>Testes since 2023.2 until 2025.2</li>  
   </ul>
 """.trimIndent())
     }
