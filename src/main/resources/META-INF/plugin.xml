@@ -1,12 +1,11 @@
 <idea-plugin>
-    <id>io.github.abpubli.dot-compat</id>
+    <id>io.github.abpubli.dot-support</id>
 
-    <name>Dot Compat</name>
+    <name>Dot Support</name>
 
     <vendor email="borucki.andrzej@gmail.com" url="https://github.com/andr1972">Andrzej Borucki</vendor>
     <description><![CDATA[
     Provides editing and live preview support for Graphviz DOT language files (.dot).
-    DOT preview plugin for older IDEs (2023.1) with Batik SVG engine.
 
     <b>Features:</b>
     <ul>

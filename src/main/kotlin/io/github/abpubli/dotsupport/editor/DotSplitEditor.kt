@@ -171,7 +171,7 @@ class DotSplitEditor(
     }
 
     override fun getComponent(): JComponent = mainPanel
-    override fun getPreferredFocusedComponent(): JComponent? = textEditor.preferredFocusedComponent
+    override fun getPreferredFocusedComponent(): JComponent? = previewComponent
     override fun getName(): String = "Dot"
     override fun setState(state: FileEditorState) {
     }

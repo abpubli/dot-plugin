@@ -13,8 +13,15 @@ repositories {
     mavenCentral()
 }
 
+dependencies {
+    implementation("org.apache.xmlgraphics:batik-transcoder:1.17") {
+        exclude(group = "xml-apis", module = "xml-apis")
+        exclude(group = "xerces", module = "xercesImpl") // 👈 to kluczowe
+    }
+}
+
 intellij { // Target IDE Platform
-    version.set("2023.1.4")
+    version.set("2023.2.8")
     type.set("PC")
     plugins.set(listOf()) // No plugin dependencies declared
 }
@@ -41,7 +48,6 @@ tasks {
   <ul>
     <li>Zoom</li>
     <li>Using svg vector to zoom image</li>
-    <li>Extended compatibility since 2023.1</li>
   </ul>
 """.trimIndent())
     }
