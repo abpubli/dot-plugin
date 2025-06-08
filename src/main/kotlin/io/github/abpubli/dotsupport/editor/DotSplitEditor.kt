@@ -81,11 +81,11 @@ class DotSplitEditor(
 
         val panel = JPanel()
         panel.layout = BoxLayout(panel, BoxLayout.X_AXIS)
-        panel.add(toolbar.component)
-        panel.add(Box.createHorizontalStrut(8))
         panel.add(JLabel("Zoom:"))
         panel.add(Box.createHorizontalStrut(4))
         panel.add(zoomField)
+        panel.add(Box.createHorizontalStrut(8))
+        panel.add(toolbar.component)
 
         headerPanel.add(panel, BorderLayout.EAST)
 
