@@ -35,6 +35,14 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
     }
 
     private var disposed = false
+    private var scale: Float = 1.0f
+
+    fun setZoomPercent(percent: Float) {
+        scale = percent / 100f
+        if (lastRenderedText != null) {
+            triggerUpdate(lastRenderedText!!, force = true)
+        }
+    }
 
     @Volatile
     private var lastRenderingTask: Future<*>? = null
@@ -234,7 +242,15 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
     }
 
     private fun updateImage(image: BufferedImage) {
-        imageLabel.icon = ImageIcon(image)
+        val scaledImage = if (scale != 1.0f) {
+            val w = (image.width * scale).toInt().coerceAtLeast(1)
+            val h = (image.height * scale).toInt().coerceAtLeast(1)
+            image.getScaledInstance(w, h, java.awt.Image.SCALE_SMOOTH)
+        } else {
+            image
+        }
+
+        imageLabel.icon = ImageIcon(scaledImage)
         imageLabel.text = null
         showStatus("Rendering completed successfully") // Keep using showStatus for consistency
         imageScrollPane.revalidate()
