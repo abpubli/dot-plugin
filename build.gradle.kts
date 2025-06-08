@@ -39,7 +39,9 @@ tasks {
         untilBuild.set(providers.gradleProperty("pluginUntilBuild"))
         changeNotes.set("""
   <ul>
-    <li>Zoom</li> 
+    <li>Zoom</li>
+    <li>Using svg vector to zoom image</li>
+    <li>Extended compatibility since 2023.1</li>
   </ul>
 """.trimIndent())
     }

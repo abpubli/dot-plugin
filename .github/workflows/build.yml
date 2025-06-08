@@ -78,6 +78,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           # Name of the artifact as it will appear in GitHub UI
-          name: dot-support-plugin
+          name: dot-compat-plugin
           # Path to the built plugin file(s). '*' handles potential version numbers in the filename.
           path: build/distributions/*.zip

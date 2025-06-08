@@ -9,13 +9,19 @@ import com.intellij.util.ui.UIUtil
 import io.github.abpubli.dotsupport.external.DotExecutionResult
 import io.github.abpubli.dotsupport.external.GRAPHVIZ_ISSUE_PATTERN
 import io.github.abpubli.dotsupport.external.runDotCommand
+import org.apache.batik.transcoder.TranscoderInput
+import org.apache.batik.transcoder.TranscoderOutput
+import org.apache.batik.transcoder.image.ImageTranscoder
+import org.xml.sax.InputSource
 import java.awt.BorderLayout
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
+import java.io.StringReader
 import java.util.concurrent.Future
 import java.util.concurrent.TimeoutException
 import javax.imageio.ImageIO
 import javax.swing.*
+import javax.xml.parsers.DocumentBuilderFactory
 
 
 /**
@@ -90,6 +96,61 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
     @Volatile
     private var pendingText: String? = null
 
+    fun convertSvgLengthToPixels(length: String, dpi: Float = 96f): Float {
+        val regex = Regex("""([0-9.]+)\s*([a-z%]*)""")
+        val match = regex.matchEntire(length.trim()) ?: return 0f
+
+        val value = match.groupValues[1].toFloatOrNull() ?: return 0f
+        val unit = match.groupValues[2].lowercase()
+
+        val multiplier = when (unit) {
+            "", "px" -> 1.0f
+            "pt" -> dpi / 72f
+            "in" -> dpi
+            "cm" -> dpi / 2.54f
+            "mm" -> dpi / 25.4f
+            "pc" -> dpi / 6f
+            "%" -> 1f // nie wiadomo do czego się odnosi — musisz pominąć
+            else -> 1f // default fallback
+        }
+
+        return value * multiplier
+    }
+
+    fun renderSvgToBufferedImage(svgBytes: ByteArray, scale: Float = 1.0f): BufferedImage {
+        var renderedImage: BufferedImage? = null
+
+        val transcoder = object : ImageTranscoder() {
+            override fun createImage(w: Int, h: Int): BufferedImage {
+                return UIUtil.createImage(null, w, h, BufferedImage.TYPE_INT_ARGB)
+            }
+
+            override fun writeImage(img: BufferedImage, out: TranscoderOutput?) {
+                renderedImage = img
+            }
+        }
+
+        val dbf = DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", false) // NIE true!
+        }
+        val builder = dbf.newDocumentBuilder()
+        builder.setEntityResolver { _, _ -> InputSource(StringReader("")) }
+        val document = builder.parse(ByteArrayInputStream(svgBytes))
+        val svgElement = document.documentElement
+        val widthAttr = svgElement.getAttribute("width")
+        val widthSvg = convertSvgLengthToPixels(widthAttr)
+
+        val input = TranscoderInput(ByteArrayInputStream(svgBytes))
+        transcoder.addTranscodingHint(ImageTranscoder.KEY_WIDTH, widthSvg * scale)
+        transcoder.transcode(input, null)
+
+        return renderedImage ?: throw IllegalStateException("Batik SVG rendering failed")
+    }
+
     fun triggerUpdate(dotText: String, force: Boolean = false) {
         LOG.trace("triggerUpdate called. Force: $force, New text length: ${dotText.length}, Last text length: ${lastRenderedText?.length}")
         if (!force && dotText == lastRenderedText) {
@@ -123,7 +184,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
                     return@executeOnPooledThread
                 }
 
-                executionResult = runDotCommand(dotText, "png", 15)
+                executionResult = runDotCommand(dotText, "svg", 15)
 
                 if (Thread.currentThread().isInterrupted) {
                     LOG.debug("Background thread [${Thread.currentThread().name}]: Task cancelled after 'dot' execution.")
@@ -135,12 +196,12 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
 
                 lastRenderedText = dotText
 
-                val imageBytes = executionResult.outputBytes
+                val svgBytes = executionResult.outputBytes
                 val errors = executionResult.errorOutput
                 val exitCode = executionResult.exitCode
                 val thisTaskFuture = lastRenderingTask
 
-                LOG.debug("Direct 'dot' execution finished. Exit code: $exitCode, Stderr present: ${!errors.isNullOrBlank()}, Output bytes: ${imageBytes?.size}")
+                LOG.debug("Direct 'dot' execution finished. Exit code: $exitCode, Stderr present: ${!errors.isNullOrBlank()}, Output bytes: ${svgBytes?.size}")
 
                 SwingUtilities.invokeLater {
                     if (thisTaskFuture != this@GraphvizPreviewPanel.lastRenderingTask || thisTaskFuture?.isCancelled == true) {
@@ -165,10 +226,10 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
                     }
 
                     var imageDisplayed = false
-                    if (imageBytes != null && imageBytes.isNotEmpty()) {
+                    if (svgBytes != null && svgBytes.isNotEmpty()) {
                         try {
-                            val image = ImageIO.read(ByteArrayInputStream(imageBytes))
-                            if (image != null) {
+                            val image = renderSvgToBufferedImage(svgBytes, scale)
+                            if (image != null) {//todo always true
                                 updateImage(image)
                                 imageDisplayed = true
                                 if (!errors.isNullOrBlank()) {
@@ -242,15 +303,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
     }
 
     private fun updateImage(image: BufferedImage) {
-        val scaledImage = if (scale != 1.0f) {
-            val w = (image.width * scale).toInt().coerceAtLeast(1)
-            val h = (image.height * scale).toInt().coerceAtLeast(1)
-            image.getScaledInstance(w, h, java.awt.Image.SCALE_SMOOTH)
-        } else {
-            image
-        }
-
-        imageLabel.icon = ImageIcon(scaledImage)
+        imageLabel.icon = ImageIcon(image)
         imageLabel.text = null
         showStatus("Rendering completed successfully") // Keep using showStatus for consistency
         imageScrollPane.revalidate()

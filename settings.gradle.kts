@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "dot-support"
+rootProject.name = "dot-compat"
