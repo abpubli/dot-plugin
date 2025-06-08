@@ -19,9 +19,14 @@ import com.intellij.ui.JBSplitter
 import io.github.abpubli.dotsupport.editor.preview.GraphvizPreviewPanel
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.Dimension
 import java.beans.PropertyChangeListener
+import javax.swing.Box
+import javax.swing.BoxLayout
 import javax.swing.JComponent
+import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.JTextField
 
 private class DotEditorHeader(panel: JComponent) : EditorHeaderComponent() {
     init {
@@ -47,13 +52,42 @@ class DotSplitEditor(
         com.intellij.ide.util.PropertiesComponent.getInstance().getValue("dot.viewMode", ViewMode.SPLIT.name)
     )
 
+    private fun applyZoom(scalePercent: Float) {
+        if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
+            previewComponent.showStatus("Zoom set to $scalePercent% (placeholder)")
+        }
+    }
+
     init {
         splitter.firstComponent = textEditor.component
         splitter.secondComponent = previewComponent
 
         val toolbar = createToolbar()
         val headerPanel = JPanel(BorderLayout())
-        headerPanel.add(toolbar.component, BorderLayout.EAST)
+
+        val zoomField = JTextField("100", 4)
+        zoomField.maximumSize = Dimension(50, zoomField.preferredSize.height)
+        zoomField.toolTipText = "Zoom % — press Enter to apply"
+
+        zoomField.addActionListener {
+            val text = zoomField.text.trim()
+            val value = text.toFloatOrNull()
+            if (value != null && value > 0f) {
+                applyZoom(value)
+            } else {
+                zoomField.text = "100"
+            }
+        }
+
+        val panel = JPanel()
+        panel.layout = BoxLayout(panel, BoxLayout.X_AXIS)
+        panel.add(toolbar.component)
+        panel.add(Box.createHorizontalStrut(8))
+        panel.add(JLabel("Zoom:"))
+        panel.add(Box.createHorizontalStrut(4))
+        panel.add(zoomField)
+
+        headerPanel.add(panel, BorderLayout.EAST)
 
         val wrappedHeader = DotEditorHeader(headerPanel)
 

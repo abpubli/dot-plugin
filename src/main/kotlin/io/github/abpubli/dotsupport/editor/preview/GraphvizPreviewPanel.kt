@@ -269,7 +269,7 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
      * Clears any existing image from the display. Must be called on EDT.
      * @param message The status message to display.
      */
-    private fun showStatus(message: String) {
+    fun showStatus(message: String) {
         statusTextArea.text = message
         statusTextArea.foreground = JBUI.CurrentTheme.Label.foreground() // Standard text color
         statusTextArea.background = UIUtil.getPanelBackground() // Ensure background matches panel

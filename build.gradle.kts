@@ -7,22 +7,21 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.4.6"
+version = "1.5.0"
 
 repositories {
     mavenCentral()
 }
 
 intellij { // Target IDE Platform
-    version.set("2024.3.5")
-    type.set("IC")
+    version.set("2023.1.4")
+    type.set("PC")
     plugins.set(listOf()) // No plugin dependencies declared
 }
 
 tasks.named<org.jetbrains.intellij.tasks.BuildSearchableOptionsTask>("buildSearchableOptions") {
     enabled = false // Disabled due to non-fatal SEVERE errors (platform issue) logged by this task during build.
 }
-
 
 tasks {
     withType<JavaCompile> {
@@ -36,12 +35,11 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("232")
-        untilBuild.set("252.*")
+        sinceBuild.set(providers.gradleProperty("pluginSinceBuild"))
+        untilBuild.set(providers.gradleProperty("pluginUntilBuild"))
         changeNotes.set("""
   <ul>
-    <li>Extended compatibility with older IDE versions</li>
-    <li>Testes since 2023.2 until 2025.2</li>  
+    <li>Zoom</li> 
   </ul>
 """.trimIndent())
     }
