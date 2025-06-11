@@ -7,7 +7,6 @@ import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.search.FilenameIndex
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import java.awt.Font
@@ -21,6 +20,18 @@ class DotSettingsConfigurable : Configurable {
     private var dotPathField: JTextField? = null
 
     override fun getDisplayName() = "Dot Support"
+
+    private fun findNearestExistingFile(path: String): VirtualFile? {
+        var file = File(path.trim())
+
+        while (!file.exists()) {
+            file = file.parentFile ?: break
+        }
+
+        return if (file.exists())
+            LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
+        else null
+    }
 
     override fun createComponent(): JComponent {
         val settings = DotSettings.getInstance()
@@ -39,8 +50,8 @@ class DotSettingsConfigurable : Configurable {
                     cell(dotPathField!!).align(AlignX.FILL)
                     button("Browse...") {
                         val currentPath = dotPathField!!.text.trim()
-                        val initialFile = if (currentPath.isNotBlank()) File(currentPath) else null
-                        val startDirVirtual = initialFile?.let { LocalFileSystem.getInstance().findFileByIoFile(it) }
+                        val startDirVirtual = findNearestExistingFile(currentPath)
+
                         val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
                             .withTitle("Select Graphviz 'dot' Executable")
 
