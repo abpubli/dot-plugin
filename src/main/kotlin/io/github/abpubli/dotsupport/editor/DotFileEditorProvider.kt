@@ -59,6 +59,12 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
         }
     }
 
+    init{
+        val props = PropertiesComponent.getInstance()
+        val warningKey = "dotplugin.graphviz.warning.shown"
+        props.setValue(warningKey, false)
+    }
+
     /**
      * Creates the editor instance for the given DOT file.
      * Returns an instance of DotEditorWithPreview.
@@ -67,17 +73,15 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
         val textEditor = TextEditorProvider.getInstance().createEditor(project, file) as TextEditor
         val previewPanel = GraphvizPreviewPanel()
 
-        val dotPath = DotSettings.getInstance().dotPath.trim()
-        val exists = dotPath.isNotBlank() && File(dotPath).isFile && File(dotPath).canExecute()
+        SwingUtilities.invokeLater {
+            val dotPath = DotSettings.getInstance().dotPath.trim()
+            val exists = dotPath.isNotBlank() && File(dotPath).isFile && File(dotPath).canExecute()
+            if (!exists) {
+                val props = PropertiesComponent.getInstance()
+                val warningKey = "dotplugin.graphviz.warning.shown"
+                if (!props.getBoolean(warningKey, false)) {
+                    props.setValue(warningKey, true)
 
-        if (!exists) {
-            val props = PropertiesComponent.getInstance(project)
-            val warningKey = "dotplugin.graphviz.warning.shown"
-
-            if (!props.getBoolean(warningKey, false)) {
-                props.setValue(warningKey, true)
-
-                SwingUtilities.invokeLater {
                     val instruction = getInstallInstruction()
                     val result = Messages.showOkCancelDialog(
                         project,
@@ -91,7 +95,7 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
                         CopyPasteManager.getInstance().setContents(StringSelection(instruction))
                     }
                 }
-            }
+             }
         }
 
         return DotSplitEditor(textEditor, previewPanel)
