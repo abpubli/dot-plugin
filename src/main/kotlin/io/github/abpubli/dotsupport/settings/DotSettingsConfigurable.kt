@@ -4,16 +4,13 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import io.github.abpubli.dotsupport.settings.DotSettings.Companion.findDotExecutable
 import java.awt.Font
-import java.io.BufferedReader
 import java.io.File
-import java.io.InputStreamReader
 import javax.swing.JComponent
 import javax.swing.JTextField
 

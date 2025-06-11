@@ -1,7 +1,6 @@
 package io.github.abpubli.dotsupport.editor
 
 import com.intellij.ide.util.PropertiesComponent
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.FileEditorProvider

@@ -75,8 +75,8 @@ fun runDotCommand(
 ): DotExecutionResult {
     var dotPath = DotSettings.getInstance().dotPath.trim()
     if (dotPath.isBlank()) {
-        dotPath = findDotExecutable() ?: "";
-        DotSettings.getInstance().dotPath = dotPath;
+        dotPath = findDotExecutable() ?: ""
+        DotSettings.getInstance().dotPath = dotPath
     }
     val command = listOf(dotPath, "-T$outputFormat")
     val processBuilder = ProcessBuilder(command)
