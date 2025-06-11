@@ -49,7 +49,9 @@ class DotSettingsConfigurable : Configurable {
                 row("Path to dot:") {
                     cell(dotPathField!!).align(AlignX.FILL)
                     button("Browse...") {
-                        val currentPath = dotPathField!!.text.trim()
+                        var currentPath = dotPathField!!.text.trim()
+                        if (currentPath.isBlank())
+                            currentPath = findDotExecutable() ?: ""
                         val startDirVirtual = findNearestExistingFile(currentPath)
 
                         val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
