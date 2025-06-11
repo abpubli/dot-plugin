@@ -9,6 +9,7 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
+import io.github.abpubli.dotsupport.settings.DotSettings.Companion.findDotExecutable
 import java.awt.Font
 import java.io.BufferedReader
 import java.io.File
@@ -69,19 +70,6 @@ class DotSettingsConfigurable : Configurable {
                     }
                 }
             }
-        }
-    }
-
-    private fun findDotExecutable(): String? {
-        return try {
-            val command = if (SystemInfo.isWindows) "where dot" else "which dot"
-            val process = Runtime.getRuntime().exec(command)
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val path = reader.readLine()
-            reader.close()
-            if (path != null && path.isNotBlank()) path else null
-        } catch (e: Exception) {
-            null
         }
     }
 

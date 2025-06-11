@@ -1,5 +1,7 @@
 package io.github.abpubli.dotsupport.external
 
+import io.github.abpubli.dotsupport.settings.DotSettings
+import io.github.abpubli.dotsupport.settings.DotSettings.Companion.findDotExecutable
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
@@ -71,9 +73,12 @@ fun runDotCommand(
     outputFormat: String,
     timeoutSeconds: Long = 10 // default timeout
 ): DotExecutionResult {
-
-    // we assume 'dot' is in the system PATH
-    val command = listOf("dot", "-T$outputFormat")
+    var dotPath = DotSettings.getInstance().dotPath.trim()
+    if (dotPath.isBlank()) {
+        dotPath = findDotExecutable() ?: "";
+        DotSettings.getInstance().dotPath = dotPath;
+    }
+    val command = listOf(dotPath, "-T$outputFormat")
     val processBuilder = ProcessBuilder(command)
     var process: Process? = null
     val executor = Executors.newFixedThreadPool(3) // Threads for stdin, stdout, stderr
