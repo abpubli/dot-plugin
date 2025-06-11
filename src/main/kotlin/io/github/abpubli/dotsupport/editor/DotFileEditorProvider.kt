@@ -60,7 +60,7 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
     }
 
     private object DotWarningFlag {
-        var shownThisSession: Boolean = false
+        var closeMessageTime = System.currentTimeMillis()
     }
 
     /**
@@ -70,12 +70,12 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
         val textEditor = TextEditorProvider.getInstance().createEditor(project, file) as TextEditor
         val previewPanel = GraphvizPreviewPanel()
+        val createEditorTime = System.currentTimeMillis()
 
         SwingUtilities.invokeLater {
             val dotPath = DotSettings.getInstance().dotPath.trim()
             val exists = dotPath.isNotBlank() && File(dotPath).isFile && File(dotPath).canExecute()
-            if (!exists && !DotWarningFlag.shownThisSession) {
-                DotWarningFlag.shownThisSession = true
+            if (!exists && createEditorTime > DotWarningFlag.closeMessageTime + 500) {
                 val instruction = getInstallInstruction()
                 val result = Messages.showOkCancelDialog(
                     project,
@@ -88,6 +88,7 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
                 if (result == Messages.OK) {
                     CopyPasteManager.getInstance().setContents(StringSelection(instruction))
                 }
+                DotWarningFlag.closeMessageTime = System.currentTimeMillis()
              }
         }
 
