@@ -22,6 +22,11 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="io.github.abpubli.dotsupport.settings.DotSettings"/>
+        <projectConfigurable instance="io.github.abpubli.dotsupport.settings.DotSettingsConfigurable"
+                             displayName="Dot Support"
+                             groupId="tools"/>
+
         <externalAnnotator language="AbpubliDot" implementationClass="io.github.abpubli.dotsupport.validation.DotSyntaxAnnotator"/>
 
         <fileEditorProvider implementation="io.github.abpubli.dotsupport.editor.DotFileEditorProvider"/>
