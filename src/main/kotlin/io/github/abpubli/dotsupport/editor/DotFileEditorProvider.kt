@@ -79,7 +79,9 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
                 val instruction = getInstallInstruction()
                 val result = Messages.showOkCancelDialog(
                     project,
-                    "Graphviz is not installed or the path is invalid.\n\n$instruction\n\nCopy this command to your terminal.",
+                    "Graphviz is not installed or the path is invalid.\n\n$instruction" +
+                            "\n\nCopy this command to your terminal.\n" +
+                            "or try open Settings->Tools->Dot Support",
                     "Graphviz Installation",
                     "Copy",
                     "Close",
