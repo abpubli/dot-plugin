@@ -5,10 +5,14 @@ import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.search.FilenameIndex
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import java.awt.Font
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import javax.swing.JComponent
 import javax.swing.JTextField
@@ -34,12 +38,21 @@ class DotSettingsConfigurable : Configurable {
                 row("Path to dot:") {
                     cell(dotPathField!!).align(AlignX.FILL)
                     button("Browse...") {
-                        val file = FileChooser.chooseFile(
-                            FileChooserDescriptorFactory.createSingleFileDescriptor(),
+                        val currentPath = dotPathField!!.text.trim()
+                        val initialFile = if (currentPath.isNotBlank()) File(currentPath) else null
+                        val startDirVirtual = initialFile?.let { LocalFileSystem.getInstance().findFileByIoFile(it) }
+                        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
+                            .withTitle("Select Graphviz 'dot' Executable")
+
+                        val selectedFile = FileChooser.chooseFile(
+                            descriptor,
                             null,
-                            null
+                            startDirVirtual
                         )
-                        file?.let { dotPathField!!.text = it.path }
+
+                        selectedFile?.let {
+                            dotPathField!!.text = it.path
+                        }
                     }
                 }
             }
