@@ -59,10 +59,8 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
         }
     }
 
-    init{
-        val props = PropertiesComponent.getInstance()
-        val warningKey = "dotplugin.graphviz.warning.shown"
-        props.setValue(warningKey, false)
+    private object DotWarningFlag {
+        var shownThisSession: Boolean = false
     }
 
     /**
@@ -76,24 +74,19 @@ class DotFileEditorProvider : FileEditorProvider, DumbAware {
         SwingUtilities.invokeLater {
             val dotPath = DotSettings.getInstance().dotPath.trim()
             val exists = dotPath.isNotBlank() && File(dotPath).isFile && File(dotPath).canExecute()
-            if (!exists) {
-                val props = PropertiesComponent.getInstance()
-                val warningKey = "dotplugin.graphviz.warning.shown"
-                if (!props.getBoolean(warningKey, false)) {
-                    props.setValue(warningKey, true)
-
-                    val instruction = getInstallInstruction()
-                    val result = Messages.showOkCancelDialog(
-                        project,
-                        "Graphviz is not installed or the path is invalid.\n\n$instruction\n\nCopy this command to your terminal.",
-                        "Graphviz Installation",
-                        "Copy",
-                        "Close",
-                        Messages.getInformationIcon()
-                    )
-                    if (result == Messages.OK) {
-                        CopyPasteManager.getInstance().setContents(StringSelection(instruction))
-                    }
+            if (!exists && !DotWarningFlag.shownThisSession) {
+                DotWarningFlag.shownThisSession = true
+                val instruction = getInstallInstruction()
+                val result = Messages.showOkCancelDialog(
+                    project,
+                    "Graphviz is not installed or the path is invalid.\n\n$instruction\n\nCopy this command to your terminal.",
+                    "Graphviz Installation",
+                    "Copy",
+                    "Close",
+                    Messages.getInformationIcon()
+                )
+                if (result == Messages.OK) {
+                    CopyPasteManager.getInstance().setContents(StringSelection(instruction))
                 }
              }
         }
