@@ -1,11 +1,13 @@
 package io.github.abpubli.dotsupport.settings
 
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
+import java.awt.Font
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import javax.swing.JComponent
@@ -24,6 +26,8 @@ class DotSettingsConfigurable : Configurable {
         }
 
         dotPathField = JTextField(settings.dotPath)
+        val editorFont = EditorColorsManager.getInstance().globalScheme.editorFontName
+        dotPathField!!.font = Font(editorFont, Font.PLAIN, dotPathField!!.font.size)
 
         return panel {
             group("Graphviz Settings") {
