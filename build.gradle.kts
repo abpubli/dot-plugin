@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.6.0"
+version = "1.6.1"
 
 repositories {
     mavenCentral()
@@ -46,8 +46,9 @@ tasks {
         untilBuild.set(providers.gradleProperty("pluginUntilBuild"))
         changeNotes.set("""
   <ul>
-    <li>Zoom</li>
-    <li>Using svg vector to zoom image</li>
+    <li>Settings/Tools/Dot Support: set path do dot</li>
+    <li>autodetect dot path</li>
+    <li>info box about Graphviz installation</li>
   </ul>
 """.trimIndent())
     }
