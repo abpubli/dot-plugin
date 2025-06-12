@@ -33,7 +33,9 @@ class DotSettings : PersistentStateComponent<DotSettings.State> {
         fun findDotExecutable(): String? {
             try {
                 val command = if (SystemInfo.isWindows) "where dot" else "which dot"
-                val process = Runtime.getRuntime().exec(command)
+                val process = ProcessBuilder(command.split(" "))
+                    .redirectErrorStream(true)
+                    .start()
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
                 val path = reader.readLine()
                 reader.close()

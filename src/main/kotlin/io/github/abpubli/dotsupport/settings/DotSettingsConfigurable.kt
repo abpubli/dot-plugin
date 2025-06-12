@@ -2,7 +2,7 @@ package io.github.abpubli.dotsupport.settings
 
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.fileChooser.FileChooser
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -52,8 +52,14 @@ class DotSettingsConfigurable : Configurable {
                             currentPath = findDotExecutable() ?: ""
                         val startDirVirtual = findNearestExistingFile(currentPath)
 
-                        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
-                            .withTitle("Select Graphviz 'dot' Executable")
+                        val descriptor = FileChooserDescriptor(
+                            true,   // chooseFiles
+                            false,  // chooseFolders
+                            false,  // chooseJars
+                            false,  // chooseJarsAsFiles
+                            false,  // chooseJarContents
+                            false   // chooseMultiple
+                        ).withTitle("Select Graphviz 'dot' Executable")
 
                         val selectedFile = FileChooser.chooseFile(
                             descriptor,
