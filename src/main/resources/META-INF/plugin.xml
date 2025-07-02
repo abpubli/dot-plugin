@@ -38,6 +38,8 @@
                   extensions="dot;gv"/>
 
         <lang.parserDefinition language="AbpubliDot" implementationClass="io.github.abpubli.dotsupport.parsing.DotParserDefinition"/>
+
+        <postStartupActivity implementation="io.github.abpubli.dotsupport.lifecycle.DotSupportStartupActivity"/>
     </extensions>
 
     <actions>

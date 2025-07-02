@@ -36,8 +36,8 @@ private class DotEditorHeader(panel: JComponent) : EditorHeaderComponent() {
 }
 
 class DotSplitEditor(
-    private val textEditor: TextEditor,
-    private val previewComponent: JComponent
+    val textEditor: TextEditor,
+    val previewComponent: JComponent
 ) : FileEditor, Disposable {
 
     private val splitter = JBSplitter(
