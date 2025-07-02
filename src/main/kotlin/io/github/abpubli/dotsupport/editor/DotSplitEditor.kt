@@ -54,7 +54,7 @@ class DotSplitEditor(
 
     private fun applyZoom(scalePercent: Float) {
         if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
-            (previewComponent as? GraphvizPreviewPanel)?.setZoomPercent(scalePercent)
+            previewComponent?.setZoomPercent(scalePercent)
         }
     }
 
@@ -145,7 +145,7 @@ class DotSplitEditor(
                 override fun actionPerformed(e: AnActionEvent) {
                     if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
                         val document = textEditor.editor.document
-                        (previewComponent as GraphvizPreviewPanel).triggerUpdate(document.text, force = true)
+                        previewComponent.triggerUpdate(document.text, force = true)
                     }
                 }
             })
