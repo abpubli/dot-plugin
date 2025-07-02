@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.6.1"
+version = "1.7.0"
 
 repositories {
     mavenCentral()
@@ -46,9 +46,8 @@ tasks {
         untilBuild.set(providers.gradleProperty("pluginUntilBuild"))
         changeNotes.set("""
   <ul>
-    <li>Settings/Tools/Dot Support: set path do dot</li>
-    <li>autodetect dot path</li>
-    <li>info box about Graphviz installation</li>
+    <li>Automatically refresh preview when .dot file is changed externally</li>
+    <li>Added Refresh button to preview toolbar</li>        
   </ul>
 """.trimIndent())
     }
