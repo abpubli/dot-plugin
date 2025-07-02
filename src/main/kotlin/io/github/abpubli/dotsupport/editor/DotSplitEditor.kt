@@ -54,7 +54,7 @@ class DotSplitEditor(
 
     private fun applyZoom(scalePercent: Float) {
         if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
-            previewComponent?.setZoomPercent(scalePercent)
+            previewComponent.setZoomPercent(scalePercent)
         }
     }
 
