@@ -123,6 +123,15 @@ class DotSplitEditor(
 
     private fun createToolbar(): ActionToolbar {
         val group = DefaultActionGroup().apply {
+            add(object : DumbAwareAction("Refresh Preview", "Refresh Graphviz preview", AllIcons.Actions.Refresh) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
+                        val document = textEditor.editor.document
+                        previewComponent.triggerUpdate(document.text, force = true)
+                    }
+                }
+            })
+            addSeparator()
             add(object : DumbAwareAction("Editor Only", "Show only DOT editor", AllIcons.Actions.Edit) {
                 override fun actionPerformed(e: AnActionEvent) {
                     viewMode = ViewMode.EDITOR_ONLY
@@ -139,14 +148,6 @@ class DotSplitEditor(
                 override fun actionPerformed(e: AnActionEvent) {
                     viewMode = ViewMode.PREVIEW_ONLY
                     applyViewMode()
-                }
-            })
-            add(object : DumbAwareAction("Refresh Preview", "Refresh Graphviz preview", AllIcons.Actions.Refresh) {
-                override fun actionPerformed(e: AnActionEvent) {
-                    if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
-                        val document = textEditor.editor.document
-                        previewComponent.triggerUpdate(document.text, force = true)
-                    }
                 }
             })
             addSeparator()
