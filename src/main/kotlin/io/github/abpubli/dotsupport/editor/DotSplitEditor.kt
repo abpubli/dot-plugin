@@ -141,6 +141,14 @@ class DotSplitEditor(
                     applyViewMode()
                 }
             })
+            add(object : DumbAwareAction("Refresh Preview", "Refresh Graphviz preview", AllIcons.Actions.Refresh) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
+                        val document = textEditor.editor.document
+                        (previewComponent as GraphvizPreviewPanel).triggerUpdate(document.text, force = true)
+                    }
+                }
+            })
             addSeparator()
             add(ToggleSplitOrientationAction(splitter))
         }
