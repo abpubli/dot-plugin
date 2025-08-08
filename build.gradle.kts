@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.withType
+import org.jetbrains.intellij.tasks.RunIdeTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -7,17 +9,10 @@ plugins {
 }
 
 group = "io.github.abpubli"
-version = "1.7.0"
+version = "1.8.0"
 
 repositories {
     mavenCentral()
-}
-
-dependencies {
-    implementation("org.apache.xmlgraphics:batik-transcoder:1.17") {
-        exclude(group = "xml-apis", module = "xml-apis")
-        exclude(group = "xerces", module = "xercesImpl") // 👈 to kluczowe
-    }
 }
 
 intellij { // Target IDE Platform
@@ -31,6 +26,10 @@ tasks.named<org.jetbrains.intellij.tasks.BuildSearchableOptionsTask>("buildSearc
 }
 
 tasks {
+    withType<RunIdeTask> {
+        jvmArgs("-Dide.browser.jcef.sandbox.enable=false")
+    }
+
     withType<JavaCompile> {
         sourceCompatibility = "17"
         targetCompatibility = "17"
@@ -46,8 +45,8 @@ tasks {
         untilBuild.set(providers.gradleProperty("pluginUntilBuild"))
         changeNotes.set("""
   <ul>
-    <li>Automatically refresh preview when .dot file is changed externally</li>
-    <li>Added Refresh button to preview toolbar</li>        
+    <li>uses JCEF instead Batik for SVG</li>
+    <li>significantly lighter distribution file</li>        
   </ul>
 """.trimIndent())
     }

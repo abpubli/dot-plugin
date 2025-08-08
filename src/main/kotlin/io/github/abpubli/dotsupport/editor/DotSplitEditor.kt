@@ -52,7 +52,7 @@ class DotSplitEditor(
         com.intellij.ide.util.PropertiesComponent.getInstance().getValue("dot.viewMode", ViewMode.SPLIT.name)
     )
 
-    private fun applyZoom(scalePercent: Float) {
+    private fun applyZoom(scalePercent: Double) {
         if (previewComponent is GraphvizPreviewPanel && previewComponent.isDisplayable) {
             previewComponent.setZoomPercent(scalePercent)
         }
@@ -71,8 +71,8 @@ class DotSplitEditor(
 
         zoomField.addActionListener {
             val text = zoomField.text.trim()
-            val value = text.toFloatOrNull()
-            if (value != null && value > 0f) {
+            val value = text.toDoubleOrNull()
+            if (value != null && value > 0) {
                 applyZoom(value)
             } else {
                 zoomField.text = "100"
