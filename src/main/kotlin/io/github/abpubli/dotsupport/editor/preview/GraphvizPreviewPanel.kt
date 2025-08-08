@@ -198,17 +198,25 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
      * Note: no dependencies – uses DOM from JDK. We do not parse DTD (XXE off).
      */
     private fun sanitizeSvg(input: String): String {
+        // 1) Remove any BOM and DOCTYPE so that the parser doesn't complain and doesn't download anything
+        val noBom = input.trimStart('\uFEFF')
+        val withoutDoctype = noBom.replace(Regex("(?is)<!DOCTYPE[^>]*>"), " ")
+
         val dbf = DocumentBuilderFactory.newInstance().apply {
             setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeature("http://xml.org/sax/features/external-general-entities", false)
-            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            // We leave the DOCTYPE ban (we already cut it out above — no errors in the log)
+            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
             isXIncludeAware = false
             isExpandEntityReferences = false
             isNamespaceAware = true
         }
-        val builder = dbf.newDocumentBuilder()
-        val doc = builder.parse(InputSource(StringReader(input)))
+        val builder = dbf.newDocumentBuilder().apply {
+            // Additional security lock – no external entities/DTDs
+            setEntityResolver { _, _ -> InputSource(StringReader("")) }
+        }
+        val doc = builder.parse(InputSource(StringReader(withoutDoctype)))
 
         val dangerousTags = setOf(
             "script", "foreignObject", "iframe", "object", "embed",
@@ -281,7 +289,6 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
 
         // Remove the entire <style> (the easiest way). If you want to keep the styles, convert it to a url() filter.
         val styleNodes = doc.getElementsByTagName("style")
-        // Note: LiveNodeList – we remove from the end
         for (i in styleNodes.length - 1 downTo 0) {
             val n = styleNodes.item(i)
             n.parentNode?.removeChild(n)
