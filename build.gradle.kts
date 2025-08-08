@@ -46,6 +46,7 @@ tasks {
         changeNotes.set("""
   <ul>
     <li>uses JCEF instead Batik for SVG</li>
+    <li>sanitizing SVG for security</li>
     <li>significantly lighter distribution file</li>        
   </ul>
 """.trimIndent())

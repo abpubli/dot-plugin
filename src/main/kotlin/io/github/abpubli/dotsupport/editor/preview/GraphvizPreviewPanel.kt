@@ -15,6 +15,18 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Future
 import java.util.concurrent.TimeoutException
 import javax.swing.*
+import org.w3c.dom.Document
+import org.w3c.dom.Element
+import org.w3c.dom.Node
+import java.io.StringReader
+import java.io.StringWriter
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.OutputKeys
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
+import org.xml.sax.InputSource
 
 /**
  * JCEF-based preview panel for Graphviz DOT (SVG).
@@ -175,25 +187,167 @@ class GraphvizPreviewPanel : JPanel(BorderLayout()), Disposable {
         }
     }
 
+    /**
+     * Minimal, defensive SVG sanitizer:
+     * - removes elements: script, foreignObject, iframe, object, embed, audio, video, link, meta
+     * - removes all attributes beginning with “on” (onload, onclick, …)
+     * - neutralizes javascript: in href/xlink:href/src/style (url(...))
+     * - blocks external URLs (http/https/file) in href/xlink:href/src
+     * - removes <style> completely (simplest) – if you want to keep styles from Graphviz, replace this with the url() filter
+     *
+     * Note: no dependencies – uses DOM from JDK. We do not parse DTD (XXE off).
+     */
+    private fun sanitizeSvg(input: String): String {
+        val dbf = DocumentBuilderFactory.newInstance().apply {
+            setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+            isNamespaceAware = true
+        }
+        val builder = dbf.newDocumentBuilder()
+        val doc = builder.parse(InputSource(StringReader(input)))
+
+        val dangerousTags = setOf(
+            "script", "foreignObject", "iframe", "object", "embed",
+            "audio", "video", "link", "meta", "base"
+        )
+
+        fun isDangerousElement(el: Element): Boolean {
+            val lname = el.localName?.lowercase() ?: el.nodeName.lowercase()
+            return lname in dangerousTags
+        }
+
+        fun removeNode(node: Node) {
+            node.parentNode?.removeChild(node)
+        }
+
+        // DFS on tree and cleaning
+        fun walk(node: Node) {
+            var child = node.firstChild
+            while (child != null) {
+                val next = child.nextSibling
+
+                if (child.nodeType == Node.ELEMENT_NODE) {
+                    val el = child as Element
+
+                    if (isDangerousElement(el)) {
+                        removeNode(el)
+                        child = next
+                        continue
+                    }
+
+                    // Remove support for built-in events (onload, onclick, etc.)
+                    val toRemove = mutableListOf<String>()
+                    for (i in 0 until el.attributes.length) {
+                        val attr = el.attributes.item(i)
+                        val name = attr.nodeName
+                        if (name.startsWith("on", ignoreCase = true)) {
+                            toRemove += name
+                        }
+                    }
+                    toRemove.forEach { el.removeAttribute(it) }
+
+                    // Neutralize dangerous URLs in href/xlink:href/src
+                    fun purgeUrlAttr(attrName: String) {
+                        if (el.hasAttribute(attrName)) {
+                            val v = el.getAttribute(attrName).trim()
+                            val low = v.lowercase()
+                            val isExternal = low.startsWith("http:") || low.startsWith("https:") || low.startsWith("file:")
+                            val isJs = low.startsWith("javascript:")
+                            if (isExternal || isJs) {
+                                el.removeAttribute(attrName)
+                            }
+                        }
+                    }
+                    purgeUrlAttr("href")
+                    purgeUrlAttr("xlink:href")
+                    purgeUrlAttr("src")
+
+                    // Simple neutralization of potential url() in the style attribute
+                    if (el.hasAttribute("style")) {
+                        val style = el.getAttribute("style")
+                        val sanitized = style.replace(Regex("url\\s*\\(.*?\\)", RegexOption.IGNORE_CASE), "none")
+                        el.setAttribute("style", sanitized)
+                    }
+                }
+
+                if (child != null) walk(child)
+                child = next
+            }
+        }
+
+        // Remove the entire <style> (the easiest way). If you want to keep the styles, convert it to a url() filter.
+        val styleNodes = doc.getElementsByTagName("style")
+        // Note: LiveNodeList – we remove from the end
+        for (i in styleNodes.length - 1 downTo 0) {
+            val n = styleNodes.item(i)
+            n.parentNode?.removeChild(n)
+        }
+
+        walk(doc.documentElement)
+
+        return serializeXml(doc)
+    }
+
+    private fun serializeXml(doc: Document): String {
+        val tf = TransformerFactory.newInstance()
+        val transformer = tf.newTransformer().apply {
+            setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes")
+            setOutputProperty(OutputKeys.METHOD, "xml")
+            setOutputProperty(OutputKeys.INDENT, "no")
+            setOutputProperty(OutputKeys.ENCODING, "UTF-8")
+        }
+        val sw = StringWriter()
+        transformer.transform(DOMSource(doc), StreamResult(sw))
+        return sw.toString()
+    }
+
     private fun buildHtmlForSvg(svg: String, scale: Double): String {
-        // Inline initial scale so the first paint already respects current zoom
+        val cleanSvg = try {
+            sanitizeSvg(svg)
+        } catch (e: Exception) {
+            LOG.warn("SVG sanitization failed, falling back to raw SVG: ${e.message}", e)
+            svg
+        }
+
+        // Very restrictive CSP: no scripts, objects, frames, connections.
+        // We leave inline style for our transform: scale(...).
+        val csp = listOf(
+            "default-src 'none'",
+            "script-src 'none'",
+            "style-src 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "font-src 'none'",
+            "connect-src 'none'",
+            "frame-src 'none'",
+            "object-src 'none'",
+            "base-uri 'none'",
+            // additional sandbox at the document level
+            "sandbox"
+        ).joinToString("; ")
+
         return """
-            <html>
-              <head>
-                <meta charset="UTF-8"/>
-                <style>
-                  html, body { margin:0; padding:0; }
-                  /* Avoid blurry text on some DPIs by letting Chrome do vector scaling */
-                  #wrapper { transform-origin: top left; transform: scale($scale); }
-                </style>
-              </head>
-              <body>
-                <div id="wrapper">
-                  $svg
-                </div>
-              </body>
-            </html>
-        """.trimIndent()
+        <html>
+          <head>
+            <meta charset="UTF-8"/>
+            <meta http-equiv="Content-Security-Policy" content="$csp">
+            <style>
+              html, body { margin:0; padding:0; overflow:auto; }
+              #wrapper { transform-origin: top left; transform: scale($scale); }
+              /* Opcjonalnie: zapobiec klikalnym linkom, gdyby zostały */
+              svg a { pointer-events: none; }
+            </style>
+          </head>
+          <body>
+            <div id="wrapper">
+              $cleanSvg
+            </div>
+          </body>
+        </html>
+    """.trimIndent()
     }
 
     private fun loadHtml(html: String) {
