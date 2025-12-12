@@ -1,11 +1,9 @@
-import org.gradle.kotlin.dsl.withType
-import org.jetbrains.intellij.tasks.RunIdeTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
-    id("org.jetbrains.intellij") version "1.17.4"
+    id("org.jetbrains.intellij.platform") version "2.2.1"
 }
 
 group = "io.github.abpubli"
@@ -13,42 +11,50 @@ version = "1.8.0"
 
 repositories {
     mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
 }
 
-intellij { // Target IDE Platform
-    version.set("2023.2.8")
-    type.set("PC")
-    plugins.set(listOf()) // No plugin dependencies declared
+dependencies {
+    intellijPlatform {
+        clion("2025.3")
+        instrumentationTools()
+    }
 }
 
-tasks.named<org.jetbrains.intellij.tasks.BuildSearchableOptionsTask>("buildSearchableOptions") {
-    enabled = false // Disabled due to non-fatal SEVERE errors (platform issue) logged by this task during build.
+intellijPlatform {
+    pluginConfiguration {
+        ideaVersion {
+            sinceBuild = providers.gradleProperty("pluginSinceBuild")
+            untilBuild = providers.gradleProperty("pluginUntilBuild")
+        }
+        changeNotes = """
+            <ul>
+                <li>uses JCEF instead Batik for SVG</li>
+                <li>sanitizing SVG for security</li>
+                <li>significantly lighter distribution file</li>
+                <li>tested since 2023.2 until 2025.3</li>
+            </ul>
+        """.trimIndent()
+    }
 }
 
 tasks {
-    withType<RunIdeTask> {
-        jvmArgs("-Dide.browser.jcef.sandbox.enable=false")
-    }
-
     withType<JavaCompile> {
         sourceCompatibility = "17"
         targetCompatibility = "17"
     }
+
     withType<KotlinCompile> {
         compilerOptions {
             freeCompilerArgs.addAll(listOf("-Xjsr305=strict", "-Xcontext-receivers"))
         }
     }
 
-    patchPluginXml {
-        sinceBuild.set(providers.gradleProperty("pluginSinceBuild"))
-        untilBuild.set(providers.gradleProperty("pluginUntilBuild"))
-        changeNotes.set("""
-  <ul>
-    <li>uses JCEF instead Batik for SVG</li>
-    <li>sanitizing SVG for security</li>
-    <li>significantly lighter distribution file</li>        
-  </ul>
-""".trimIndent())
+    runIde {
+        jvmArgumentProviders += CommandLineArgumentProvider {
+            listOf("-Dide.browser.jcef.sandbox.enable=false")
+        }
     }
 }
