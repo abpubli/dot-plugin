@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.withType
+import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -8,6 +10,12 @@ plugins {
 
 group = "io.github.abpubli"
 version = "1.8.0"
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
 
 repositories {
     mavenCentral()
@@ -41,20 +49,13 @@ intellijPlatform {
 }
 
 tasks {
-    withType<JavaCompile> {
-        sourceCompatibility = "17"
-        targetCompatibility = "17"
+    withType<RunIdeTask> {
+        jvmArgs("-Dide.browser.jcef.sandbox.enable=false")
     }
 
-    withType<KotlinCompile> {
+    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         compilerOptions {
-            freeCompilerArgs.addAll(listOf("-Xjsr305=strict", "-Xcontext-receivers"))
-        }
-    }
-
-    runIde {
-        jvmArgumentProviders += CommandLineArgumentProvider {
-            listOf("-Dide.browser.jcef.sandbox.enable=false")
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
 }
