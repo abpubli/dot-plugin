@@ -44,6 +44,9 @@ intellijPlatform {
                 <li>significantly lighter distribution file</li>
                 <li>tested since 2023.2 until 2025.3</li>
             </ul>
+            
+            <b>Coming soon:</b> Dot Plus edition with syntax highlighting, 
+            multiple rendering engines, and more!
         """.trimIndent()
     }
 }
