@@ -37,17 +37,6 @@ intellijPlatform {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
-        changeNotes = """
-            <ul>
-                <li>uses JCEF instead Batik for SVG</li>
-                <li>sanitizing SVG for security</li>
-                <li>significantly lighter distribution file</li>
-                <li>tested since 2023.2 until 2025.3</li>
-            </ul>
-            
-            <b>Coming soon:</b> Dot Plus edition with syntax highlighting, 
-            multiple rendering engines, and more!
-        """.trimIndent()
     }
 }
 
