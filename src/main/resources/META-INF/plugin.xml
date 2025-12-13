@@ -18,15 +18,33 @@
       <li>New file template (<code>File -> New</code>) with sample content for a quick start.</li>
     </ul>
     Aims to provide a seamless workflow for viewing and editing DOT graph descriptions.
+
+    <b>Coming soon:</b> <a href="https://plugins.jetbrains.com/plugin/org.abpubli.dot">Dot Plus</a> — premium edition with syntax highlighting, multiple rendering engines, and more!
     ]]></description>
+
+    <change-notes><![CDATA[
+    <b>Coming soon:</b> Dot Plus edition with syntax highlighting, multiple rendering engines, code folding, and more!
+    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
 
+    <!-- Notification group for Dot Plus notifications -->
     <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="Dot Support Notifications"
+                           displayType="BALLOON"/>
+
         <applicationService serviceImplementation="io.github.abpubli.dotsupport.settings.DotSettings"/>
+        <applicationService serviceImplementation="io.github.abpubli.dotsupport.upgrade.DotPlusNotificationSettings"/>
+
         <projectConfigurable instance="io.github.abpubli.dotsupport.settings.DotSettingsConfigurable"
                              displayName="Dot Support"
                              groupId="tools"/>
+
+        <!-- Podkonfiguracja dla powiadomień Dot Plus -->
+        <projectConfigurable parentId="tools"
+                             instance="io.github.abpubli.dotsupport.upgrade.DotPlusNotificationConfigurable"
+                             displayName="Dot Plus Notifications"
+                             id="dot.support.dotplus.notifications"/>
 
         <externalAnnotator language="AbpubliDot" implementationClass="io.github.abpubli.dotsupport.validation.DotSyntaxAnnotator"/>
 
