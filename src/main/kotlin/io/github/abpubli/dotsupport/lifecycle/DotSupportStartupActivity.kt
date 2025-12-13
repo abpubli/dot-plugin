@@ -108,13 +108,15 @@ class DotSupportStartupActivity : ProjectActivity {
         val shouldShow = settings.shouldShowNotification(result.version, result.isAvailable)
 
         if (shouldShow) {
+            val marketplaceUrl = result.pluginUrl ?: MarketplaceChecker.getMarketplaceUrl()
+            
             when (settings.notificationMode) {
                 NotificationMode.DAILY -> {
                     log.info("Showing daily notification about Dot Plus")
                     DotPlusNotifier.showDotPlusAvailableNotification(
                         project,
                         result.version,
-                        result.downloadUrl ?: MarketplaceChecker.getMarketplaceUrl()
+                        marketplaceUrl
                     )
                 }
                 NotificationMode.ON_NEW_VERSION -> {
@@ -125,7 +127,7 @@ class DotSupportStartupActivity : ProjectActivity {
                             project,
                             oldVersion,
                             result.version,
-                            result.downloadUrl ?: MarketplaceChecker.getMarketplaceUrl()
+                            marketplaceUrl
                         )
                     } else if (!settings.dotPlusWasAvailable) {
                         // First detection - show standard notification
@@ -133,7 +135,7 @@ class DotSupportStartupActivity : ProjectActivity {
                         DotPlusNotifier.showDotPlusAvailableNotification(
                             project,
                             result.version,
-                            result.downloadUrl ?: MarketplaceChecker.getMarketplaceUrl()
+                            marketplaceUrl
                         )
                     }
                 }
