@@ -3,18 +3,17 @@ package io.github.abpubli.dotsupport.upgrade
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.net.URLEncoder
-import java.util.regex.Pattern
 
 /**
  * Service for checking Dot Plus plugin availability in JetBrains Marketplace.
- * 
- * Uses search page HTML parsing to extract JSON-LD structured data,
- * which is available even without JavaScript rendering.
+ *
+ * Uses official JetBrains Marketplace API endpoints.
  */
 object MarketplaceChecker {
 
@@ -23,17 +22,9 @@ object MarketplaceChecker {
     // Dot Plus plugin ID (textual)
     private const val DOT_PLUS_PLUGIN_ID = "org.abpubli.dot"
 
-    // Search URL template
-    private const val SEARCH_URL = "https://plugins.jetbrains.com/search?excludeTags=internal&search="
-
-    // Plugin page URL pattern to extract numeric ID
-    private val PLUGIN_URL_PATTERN = Pattern.compile("https://plugins\\.jetbrains\\.com/plugin/(\\d+)-([\\w-]+)")
-
-    // JSON-LD pattern in HTML
-    private val JSON_LD_PATTERN = Pattern.compile(
-        "<script type=\"application/ld\\+json\">(\\{.*?\"@type\":\"ItemList\".*?\\})</script>",
-        Pattern.DOTALL
-    )
+    // Official Marketplace API
+    private const val SEARCH_API = "https://plugins.jetbrains.com/api/searchPlugins"
+    private const val UPDATES_API = "https://plugins.jetbrains.com/api/plugins"
 
     data class PluginUpdateInfo(
         val version: String?,
@@ -43,26 +34,20 @@ object MarketplaceChecker {
         val pluginName: String?
     )
 
-    // JSON-LD structures
-    data class ItemList(
-        @SerializedName("@type") val type: String?,
-        @SerializedName("itemListElement") val items: List<SoftwareApplication>?
+    // Search API response
+    data class SearchResponse(
+        @SerializedName("plugins") val plugins: List<PluginSearchResult>?
     )
 
-    data class SoftwareApplication(
-        @SerializedName("@type") val type: String?,
-        @SerializedName("name") val name: String?,
-        @SerializedName("url") val url: String?,
-        @SerializedName("description") val description: String?
-    )
-
-    // Plugin details from API (after we have numeric ID)
-    data class PluginDetails(
+    data class PluginSearchResult(
         @SerializedName("id") val id: Int?,
+        @SerializedName("xmlId") val xmlId: String?,
         @SerializedName("name") val name: String?,
+        @SerializedName("link") val link: String?,
         @SerializedName("version") val version: String?
     )
 
+    // Updates API response
     data class PluginUpdate(
         @SerializedName("version") val version: String?,
         @SerializedName("id") val id: Int?
@@ -73,31 +58,39 @@ object MarketplaceChecker {
      */
     fun checkDotPlusAvailability(): PluginUpdateInfo {
         return try {
-            // Step 1: Search for plugin by ID
+            // Step 1: Search for plugin by xmlId
             val searchResult = searchPlugin(DOT_PLUS_PLUGIN_ID)
-            
+
             if (searchResult == null) {
-                LOG.info("Dot Plus not found in Marketplace search")
+                LOG.info("Dot Plus not found in Marketplace")
                 return PluginUpdateInfo(null, false, false, null, null)
             }
 
-            LOG.info("Found plugin: ${searchResult.name} at ${searchResult.url}")
+            LOG.info("Found plugin: ${searchResult.name} (id=${searchResult.id})")
 
-            // Step 2: Extract numeric ID from URL
-            val numericId = extractNumericId(searchResult.url)
+            val pluginUrl = searchResult.link?.let { "https://plugins.jetbrains.com$it" }
+                ?: "https://plugins.jetbrains.com/plugin/${searchResult.id}"
+
+            // Step 2: Check for compatible version
+            val numericId = searchResult.id
             if (numericId == null) {
-                LOG.warn("Could not extract numeric ID from URL: ${searchResult.url}")
-                return PluginUpdateInfo(null, true, false, searchResult.url, searchResult.name)
+                LOG.warn("Plugin found but no numeric ID")
+                return PluginUpdateInfo(
+                    version = searchResult.version,
+                    isAvailable = true,
+                    isCompatible = false,
+                    pluginUrl = pluginUrl,
+                    pluginName = searchResult.name
+                )
             }
 
-            // Step 3: Check for compatible version using API
             val compatibleVersion = fetchCompatibleVersion(numericId)
 
             PluginUpdateInfo(
-                version = compatibleVersion,
+                version = compatibleVersion ?: searchResult.version,
                 isAvailable = true,
                 isCompatible = compatibleVersion != null,
-                pluginUrl = searchResult.url,
+                pluginUrl = pluginUrl,
                 pluginName = searchResult.name
             )
 
@@ -108,27 +101,32 @@ object MarketplaceChecker {
     }
 
     /**
-     * Search for plugin by ID using Marketplace search page
+     * Search for plugin using official API
      */
-    private fun searchPlugin(pluginId: String): SoftwareApplication? {
-        val encodedId = URLEncoder.encode(pluginId, "UTF-8")
-        val url = URL("$SEARCH_URL$encodedId")
+    private fun searchPlugin(pluginXmlId: String): PluginSearchResult? {
+        val encodedId = URLEncoder.encode(pluginXmlId, Charsets.UTF_8)
+        val uri = URI.create("$SEARCH_API?search=$encodedId&max=5")
 
-        LOG.info("Searching: $url")
+        LOG.info("Searching: $uri")
 
-        val connection = url.openConnection() as HttpURLConnection
+        val connection = uri.toURL().openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
-        connection.setRequestProperty("Accept", "text/html")
-        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; DotSupport Plugin)")
+        connection.setRequestProperty("Accept", "application/json")
         connection.connectTimeout = 10000
         connection.readTimeout = 10000
 
         return try {
             if (connection.responseCode == 200) {
-                val html = connection.inputStream.bufferedReader().readText()
-                parseJsonLd(html)
+                val response = connection.inputStream.bufferedReader().readText()
+                LOG.debug("Search response: $response")
+
+                val searchResponse = Gson().fromJson(response, SearchResponse::class.java)
+
+                // Find exact match by xmlId
+                searchResponse.plugins?.find { it.xmlId == pluginXmlId }
+                    ?: searchResponse.plugins?.firstOrNull()
             } else {
-                LOG.warn("Search returned status: ${connection.responseCode}")
+                LOG.warn("Search API returned status: ${connection.responseCode}")
                 null
             }
         } finally {
@@ -137,49 +135,15 @@ object MarketplaceChecker {
     }
 
     /**
-     * Parse JSON-LD from HTML to find plugin info
-     */
-    private fun parseJsonLd(html: String): SoftwareApplication? {
-        val matcher = JSON_LD_PATTERN.matcher(html)
-
-        if (!matcher.find()) {
-            LOG.info("No JSON-LD found in search results (plugin probably not found)")
-            return null
-        }
-
-        val jsonLd = matcher.group(1)
-        LOG.debug("Found JSON-LD: $jsonLd")
-
-        return try {
-            val itemList = Gson().fromJson(jsonLd, ItemList::class.java)
-            // Return first result (most relevant)
-            itemList.items?.firstOrNull()
-        } catch (e: Exception) {
-            LOG.warn("Failed to parse JSON-LD", e)
-            null
-        }
-    }
-
-    /**
-     * Extract numeric plugin ID from URL like:
-     * https://plugins.jetbrains.com/plugin/16595-bison-language-support -> 16595
-     */
-    private fun extractNumericId(url: String?): String? {
-        if (url == null) return null
-        val matcher = PLUGIN_URL_PATTERN.matcher(url)
-        return if (matcher.find()) matcher.group(1) else null
-    }
-
-    /**
      * Fetch compatible version for current IDE build
      */
-    private fun fetchCompatibleVersion(numericId: String): String? {
-        val buildNumber = com.intellij.openapi.application.ApplicationInfo.getInstance().build.asString()
-        val url = URL("https://plugins.jetbrains.com/api/plugins/$numericId/updates?build=$buildNumber")
+    private fun fetchCompatibleVersion(numericId: Int): String? {
+        val buildNumber = ApplicationInfo.getInstance().build.asString()
+        val uri = URI.create("$UPDATES_API/$numericId/updates?build=$buildNumber")
 
-        LOG.info("Checking compatibility: $url")
+        LOG.info("Checking compatibility: $uri")
 
-        val connection = url.openConnection() as HttpURLConnection
+        val connection = uri.toURL().openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
         connection.setRequestProperty("Accept", "application/json")
         connection.connectTimeout = 5000
